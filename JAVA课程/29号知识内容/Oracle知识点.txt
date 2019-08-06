@@ -1,0 +1,771 @@
+SQL:
+  数据定义语言（ DDL），包括 CREATE（创建）命令、 ALTER（修改）命令、 DROP（删
+除）命令等。
+  数据操纵语言（ DML），包括 INSERT（插入）命令、 UPDATE（更新）命令、 DELETE
+（删除）命令、 SELECT … FOR UPDATE（查询）等。
+  数据查询语言（ DQL），包括基本查询语句、 Order By 子句、 Group By 子句等。
+  事务控制语言（ TCL），包括 COMMIT（提交）命令、 SAVEPOINT（保存点）命令、
+ROLLBACK（回滚）命令。
+  数据控制语言（ DCL）， GRANT（授权）命令、 REVOKE（撤销）命令。
+
+Oracle 数据库的核心是表，表中的列使用到的常见数据类型如下：
+类型 含义
+CHAR(length) 存储固定长度的字符串。参数 length 指定了长度，如果存储的字符串长
+度小于 length，用空格填充。默认长度是 1，最长不超过 2000 字节。
+VARCHAR2(length) 存储可变长度的字符串。 length 指定了该字符串的最大长度。默认长度
+是 1，最长不超过 4000 字符。
+NUMBER(p， s) 既可以存储浮点数，也可以存储整数， p 表示数字的最大位数（如果是小数包括整数部分和小数部分和小数点， p 默认是 38 为）， s 是指小数位数。
+DATE 存储日期和时间， 存储纪元、 4 位年、月、日、时、分、秒，存储时间从公元前 4712 年 1 月 1 日到公元后 4712 年 12 月 31 日。
+TIMESTAMP 不但存储日期的年月日，时分秒，以及秒后 6 位，同时包含时区。
+CLOB 存储大的文本，比如存储非结构化的 XML 文档
+BLOB 存储二进制对象，如图形、视频、声音等。
+
+对应 NUMBER 类型的示例：
+格式             输入的数字 实际的存储
+NUMBER           1234.567   1234.567
+NUMBER（ 6， 2） 123.4567   123.46
+NUMBER（ 4， 2） 12345.67   输入的数字超过了所指定的精度，数据库不能存储
+
+对于日期类型，可以使用 sysdate 内置函数可以获取当前的系统日期和时间，返回 DATE
+类型，用 systimestamp 函数可以返回当前日期、时间和时区。
+SELECT SYSDATE,SYSTIMESTAMP FROM DUAL
+dual 表在系统中只有一行一列,某些时候为了输出常量而使用dual，实际上dual并不提供数据，仅仅为了满足from的存在
+
+复制表格和数据
+CREATE TABLE maleStu AS SELECT * FROM student where ssex='男';
+仅仅复制表格，但不填入数据
+CREATE TABLE maleStu AS SELECT * FROM student where 1=2;
+
+一次插入多条数据
+INSERT INTO maleStu SELECT * FROM student;
+
+select sname into myname from student where sid=10002
+
+指定日期和时间，并转换为DATE格式
+TO_DATE('1909-08-09 06:30:10',' YYYY:MM:DD HH24:MI:SS ')
+在 Oracle 中，日期是国际化的，不同的区域安装的数据库，默认的日期格式不同，
+因此为了程序便于移植，日期的输入要使用 TO_DATE 函数对日期格式化后输入，采
+用格式化字符串对日期进行格式化时，格式化字符串中字符不区分大小写，常见的
+格式化字符如下：
+1. yyyy 表示四位年份
+2. mm 表示两位月份，比如 3 月表示为 03
+3. dd 表示两位日期
+4. hh24 表示小时从 0-23， hh12 也表示小时从 0-11。
+5. mi 表示分钟
+6. ss 表示秒
+
+
+Oracle 中的算术运算符，没有 C#中的算术运算符丰富，只有+、 -、 *、 /四个，其中除号
+(/)的结果是浮点数。求余运算只能借助函数： MOD(x,y)：返回 x 除以 y 的余数。
+
+select mod(10,3) from dual
+
+在 Oracle 中，字符串的连接用双竖线（ ||）表示
+select (sname||'是'||ssex||'同学') as 信息描述 from student where ssex='男'
+
+
+
+
+
+
+
+集合运算就是将两个或者多个结果集组合成为一个结果集。集合运算包括：
+  INTERSECT(交集)，返回两个查询共有的记录。
+  UNION ALL(并集)，返回各个查询的所有记录，包括重复记录。
+  UNION(并集)，返回各个查询的所有记录，不包括重复记录。
+  MINUS(补集)，返回第一个查询检索出的记录减去第二个查询检索出的记录之后剩
+余的记录。
+当使用集合操作的时候，要注意：查询所返回的列数以及列的类型必须匹配，列名可以
+不同。
+例如：查询哪个学生没有选课
+select sid from student
+minus
+select distinct sid from mark
+
+insert into newStu
+select * from student where sclass='1班'
+union
+select * from student where sclass='2班'
+
+内联，外联与并列查询的区别
+
+select sname,avg(cmark) 
+from student s,mark sc
+where s.sid=sc.sid
+group by s.sid,sname
+
+select sname,avg(cmark) 
+from student s inner join mark sc on s.sid=sc.sid
+group by s.sid,sname
+
+select *
+from student s inner join mark sc on s.sid=sc.sid
+
+select * 
+from student s left outer join mark sc on s.sid=sc.sid
+
+select * 
+from student s right outer join mark sc on s.sid=sc.sid
+
+select * 
+from student s full outer join mark sc on s.sid=sc.sid
+
+
+伪列：rowid、rownum
+
+表中的每一行在数据文件中都有一个物理地址， ROWID 伪列返回的就是该行的物理地址。使用 ROWID 可以快速的定位表中的某一行。 ROWID 值可以唯一的标识表中的一行
+是表格的固有属性，不会随着记录先后顺序的调整而改变
+select rowid,s.* from student s order by sage desc
+
+ROWNUM 为结果集中每一行标识一个行号,rownum是在from子句执行时动态生成
+select * from student where rownum<5
+
+找出学生表中第6到第10条记录
+
+delete用于逐行删除,速度较慢,但是可以回滚,属于DML语句
+如:
+savepoint beforedel;--创建复原点
+delete from student where sname='张三';
+select * from student where sname='张三';
+rollback to beforedel;--回滚数据
+select * from student where sname='张三'
+
+而truncate用于块删除,可以迅速删除表格所有数据,
+但是无法恢复数据,回滚无效,属于DDL
+truncate table student
+
+
+字符函数
+字符函数接受字符参数，这些参数可以是表中的列，也可以是一个字符串表达式。 下表
+列出了常用的字符函数。
+函数 说明
+ASCII(x) 返回字符 x 的 ASCII 码。
+CONCAT(x,y) 连接字符串 x 和 y。
+INSTR(x, str [,start] [,n])
+在 x 中查找 str，可以指定从 start 开始，也可以指定从
+第 n 次开始。
+select instr('hello world','world') from dual
+LENGTH(x) 返回 x 的长度。
+LOWER(x) x 转换为小写。
+UPPER(x) x 转换为大写。
+LTRIM(x[,trim_str]) 把 x 的左边截去 trim_str 字符串，缺省截去空格。
+RTRIM(x[,trim_str]) 把 x 的右边截去 trim_str 字符串，缺省截去空格。
+TRIM([trim_str FROM] x) 把 x 的两边截去 trim_str 字符串，缺省截去空格。
+REPLACE(x,old,new) 在 x 中查找 old，并替换为 new。
+SUBSTR(x,start[,length]) 返回 x 的字串，从 start 处开始，截取 length 个字符，
+缺省 length，默认到结尾。
+
+示例 示例结果
+SELECT ASCII('a') FROM DUAL 97
+SELECT CONCAT('Hello', ' world') FROM DUAL Hello world
+SELECT INSTR('Hello world'， 'or') FROM DUAL 8
+SELECT LENGTH('Hello') FROM DUAL 5
+SELECT LOWER('hElLO') FROM DUAL; hello
+SELECT UPPER('hello') FROM DUAL HELLO
+SELECT LTRIM('===HELLO===', '=') FROM DUAL HELLO===
+SELECT '=='||LTRIM(' HELLO===') FROM DUAL ==HELLO===
+SELECT RTRIM('===HELLO===', '=') FROM DUAL ===HELLO
+SELECT '='||TRIM(' HELLO ')||'=' FROM DUAL =HELLO=
+SELECT TRIM('=' FROM '===HELLO===');--   FROM DUAL HELLO
+SELECT REPLACE('ABCDE','CD','AAA')   FROM DUAL ABAAAE
+SELECT SUBSTR('ABCDE',2) FROM DUAL BCDE
+SELECT SUBSTR('ABCDE',2,3) FROM DUAL BCD
+
+数字函数
+数字函数接受数字参数，参数可以来自表中的一列，也可以是一个数字表达式。
+函数 说明 示例
+ABS(x) x 绝对值 ABS(-3)=3
+ACOS(x) x 的反余弦 ACOS(1)=0
+COS(x) 余弦 COS(1)=1.57079633
+CEIL(x) 大于或等于 x 的最小值 CEIL(5.4)=6
+FLOOR(x) 小于或等于 x 的最大值 FLOOR(5.8)=5
+LOG(x,y) x 为底 y 的对数 LOG(2,4)=2
+MOD(x,y) x 除以 y 的余数 MOD(8,3)=2
+POWER(x,y) x 的 y 次幂 POWER(2,3)=8
+ROUND(x[,y]) x 在第 y 位四舍五入 ROUND(3.456,2)=3.46
+SQRT(x) x 的平方根 SQRT(4)=2
+TRUNC(x[,y]) x 在第 y 位截断 TRUNC(3.456,2)=3.45
+
+说明：
+1. ROUND(X[,Y])，四舍五入。
+在缺省 y 时，默认 y=0；比如： ROUND(3.56)=4。
+y 是正整数，就是四舍五入到小数点后 y 位。 ROUND(5.654,2)=5.65。
+y 是负整数，四舍五入到小数点左边|y|位。 ROUND(351.654,-2)=400。
+2. TRUNC(x[,y])，直接截取，不四舍五入。
+在缺省 y 时，默认 y=0；比如： TRUNC (3.56)=3。
+y 是正整数，就是四舍五入到小数点后 y 位。 TRUNC (5.654,2)=5.65。
+y 是负整数，四舍五入到小数点左边|y|位。 TRUNC (351.654,-2)=300。
+
+日期函数
+日期函数对日期进行运算。常用的日期函数有：
+
+1. LAST_DAY(d)，返回指定日期当月的最后一天。
+select SYSDATE,LAST_DAY(SYSDATE) from dual
+
+2.EXTRACT(fmt FROM d)，提取日期中的特定部分。
+fmt 为： YEAR、 MONTH、 DAY、 HOUR、 MINUTE、 SECOND。其中 YEAR、 MONTH、 DAY
+可以为 DATE 类型匹配，也可以与 TIMESTAMP 类型匹配；但是 HOUR、 MINUTE、 SECOND 必
+须与 TIMESTAMP 类型匹配
+select SYSDATE 时间,
+       EXTRACT(YEAR from SYSDATE) 年,
+       EXTRACT(MONTH from SYSDATE) 月,
+       EXTRACT(DAY from SYSDATE) 日,
+       EXTRACT(HOUR from SYSTIMESTAMP) 时,
+       EXTRACT(MINUTE from SYSTIMESTAMP) 分,
+       EXTRACT(SECOND from SYSTIMESTAMP) 秒,
+from dual
+
+TO_CHAR(d|n[,fmt])
+把日期和数字转换为指定格式的字符串。 fmt 是格式化字符串
+针对数字的格式化，格式化字符有：
+参数    示例     说明
+9       999     指定位置处显示数字。
+.       9.9     指定位置返回小数点
+,       99,99   指定位置返回一个逗号
+$       $999    数字开头返回一个美元符号
+EEEE    9.99EEEE 科学计数法表示
+L L999 数字前加一个本地货币符号
+PR 999PR 如果数字式负数则用尖括号进行表示
+    select sysdate,add_months(sysdate,12) from dual;        --加1年
+　　select sysdate,add_months(sysdate,1) from dual;        --加1月
+　　select sysdate,to_char(sysdate+7,'yyyy-mm-dd HH24:MI:SS') from dual;   --加1星期
+　　select sysdate,to_char(sysdate+1,'yyyy-mm-dd HH24:MI:SS') from dual;   --加1天
+　　select sysdate,to_char(sysdate+1/24,'yyyy-mm-dd HH24:MI:SS') from dual;  --加1小时
+　　select sysdate,to_char(sysdate+1/24/60,'yyyy-mm-dd HH24:MI:SS') from dual;  --加1分钟
+　　select sysdate,to_char(sysdate+1/24/60/60,'yyyy-mm-dd HH24:MI:SS') from dual;  --加1秒
+　　减法
+　　select sysdate,add_months(sysdate,-12) from dual;        --减1年
+　　select sysdate,add_months(sysdate,-1) from dual;        --减1月
+　　select sysdate,to_char(sysdate-7,'yyyy-mm-dd HH24:MI:SS') from dual;   --减1星期
+　　select sysdate,to_char(sysdate-1,'yyyy-mm-dd HH24:MI:SS') from dual;   --减1天
+　　select sysdate,to_char(sysdate-1/24,'yyyy-mm-dd HH24:MI:SS') from dual;  --减1小时
+　　select sysdate,to_char(sysdate-1/24/60,'yyyy-mm-dd HH24:MI:SS') from dual;  --减1分钟
+　　select sysdate,to_char(sysdate-1/24/60/60,'yyyy-mm-dd HH24:MI:SS') from dual;  --减1秒
+　　Oracle关于时间/日期的操作
+　　1.日期时间间隔操作
+　　当前时间减去7分钟的时间
+　　select sysdate,sysdate - interval '7' MINUTE from dual
+　　当前时间减去7小时的时间
+　　select sysdate - interval '7' hour from dual
+　　当前时间减去7天的时间
+　　select sysdate - interval '7' day from dual
+　　当前时间减去7月的时间
+　　select sysdate,sysdate - interval '7' month from dual
+　　当前时间减去7年的时间
+　　select sysdate,sysdate - interval '7' year from dual
+　　时间间隔乘以一个数字
+　　select sysdate,sysdate - 8 *interval '2' hour from dual
+　　2.日期到字符操作
+　　select sysdate,to_char(sysdate,'yyyy-mm-dd hh24:mi:ss') from dual
+　　select sysdate,to_char(sysdate,'yyyy-mm-dd hh:mi:ss') from dual
+　　select sysdate,to_char(sysdate,'yyyy-ddd hh:mi:ss') from dual
+　　select sysdate,to_char(sysdate,'yyyy-mm iw-d hh:mi:ss') from dual
+
+TO_DATE(x [,fmt])
+把一个字符串以 fmt 格式转换为一个日期类型
+
+TO_NUMBER(x[,fmt])
+把一个字符串以 fmt 格式转换为一个数字。
+SELECT TO_NUMBER('-$12,345.67','$99,999.99') 金额 from dual
+
+
+序列
+序列(Sequence)是用来生成连续的整数数据的对象。序列常常用来作为主键中增长列，
+序列中的可以升序生成，也可以降序生成。创建序列的语法是：
+语法结构：创建序列
+CREATE SEQUENCE sequence_name
+[START WITH num]
+[INCREMENT BY increment]
+[MAXVALUE num|NOMAXVALUE]
+[MINVALUE num|NOMINVALUE]
+[CYCLE|NOCYCLE]
+[CACHE num|NOCACHE]
+语法解析：
+① START WITH：从某一个整数开始，升序默认值是 1，降序默认值是-1。
+② INCREMENT BY：增长数。如果是正数则升序生成，如果是负数则降序生成。升序默
+认值是 1，降序默认值是-1。
+③ MAXVALUE：指最大值。
+④ NOMAXVALUE：这是最大值的默认选项，升序的最大值是： 1027，降序默认值是-1。
+⑤ MINVALUE：指最小值。
+⑥ NOMINVALUE：这是默认值选项，升序默认值是 1，降序默认值是-1026。
+⑦ CYCLE：表示如果升序达到最大值后，从最小值重新开始；如果是降序序列，达到最
+小值后，从最大值重新开始。
+⑧ NOCYCLE：表示不重新开始，序列升序达到最大值、降序达到最小值后就报错。默
+认 NOCYCLE。
+⑨ CACHE：使用 CACHE 选项时，该序列会根据序列规则预生成一组序列号。保留在内
+存中，当使用下一个序列号时，可以更快的响应。当内存中的序列号用完时，系统
+再生成一组新的序列号，并保存在缓存中，这样可以提高生成序列号的效率。 Oracle
+默认会生产 20 个序列号。
+⑩ NOCACHE：不预先在内存中生成序列号
+
+创建一个从 1 开始，默认最大值，每次增长 1 的序列，要求 NOCYCLE，缓存中
+有 30 个预先分配好的序列号
+CREATE SEQUENCE MYSEQ
+MINVALUE 1
+START WITH 1
+NOMAXVALUE
+INCREMENT BY 1
+NOCYCLE
+CACHE 30
+
+create table stu(
+  sid number primary key,
+  sname varchar2(20)
+)
+insert into stu values(MYSEQ.NEXTVAL,'小明');
+insert into stu values(MYSEQ.NEXTVAL,'小张');
+序列创建之后，可以通过序列对象的 CURRVAL 和 NEXTVAL 两个“伪列”分别访问该序
+列的当前值和下一个值
+SELECT MYSEQ.NEXTVAL FROM DUAL;
+SELECT MYSEQ.CURRVAL FROM DUAL;
+
+使用 ALTER SEQUENCE 可以修改序列
+使用 DROP SEQUENCE 命令可以删除一个序列对象。
+
+视图
+视图（ View）实际上是一张或者多张表上的预定义查询，这些表称为基表。从视图中
+查询信息与从表中查询信息的方法完全相同。 只需要简单的 SELECT…FROM 即可。
+视图具有以下优点：
+1. 可以限制用户只能通过视图检索数据。这样就可以对最终用户屏蔽建表时底层的基
+表。
+2. 可以将复杂的查询保存为视图。可以对最终用户屏蔽一定的复杂性。
+3. 限制某个视图只能访问基表中的部分列或者部分行的特定数据。这样可以实现一定
+的安全性。
+4. 从多张基表中按一定的业务逻辑抽出用户关心的部分，形成一张虚拟表。
+语法结构：创建视图
+CREATE [OR REPLACE] [{FORCE|NOFORCE}] VIEW view_name
+AS
+SELECT查询
+[WITH READ ONLY CONSTRAINT]
+语法解析：
+1. OR REPLACE：如果视图已经存在，则替换旧视图。
+2. FORCE：即使基表不存在，也可以创建该视图，但是该视图不能正常使用，当基表
+创建成功后，视图才能正常使用。
+3. NOFORCE：如果基表不存在，无法创建视图，该项是默认选项。
+4. WITH READ ONLY：默认可以通过视图对基表执行增删改操作，但是有很多在基表上
+的限制（比如：基表中某列不能为空，但是该列没有出现在视图中，则不能通过视
+图执行 insert 操作）， WITH READ ONLY 说明视图是只读视图，不能通过该视图进行
+增删改操作。现实开发中，基本上不通过视图对表中的数据进行增删改操作。
+
+
+
+
+
+PL/SQL 块
+PL/SQL 是一种块结构的语言，一个 PL/SQL 程序包含了一个或者多个逻辑块，逻辑块中
+可以声明变量，变量在使用之前必须先声明。除了正常的执行程序外， PL/SQL 还提供了专
+门的异常处理部分进行异常处理。每个逻辑块分为三个部分，语法是：
+语法结构：PL/SQL 块的语法
+[DECLARE
+--declaration statements] ①
+BEGIN
+--executable statements ②
+[EXCEPTION
+--exception statements] ③
+END;
+语法解析：
+① 声明部分：声明部分包含了变量和常量的定义。这个部分由关键字 DECLARE 开始，
+如果不声明变量或者常量，可以省略这部分。
+② 执行部分：执行部分是 PL/SQL 块的指令部分，由关键字 BEGIN 开始，关键字 END
+结尾。所有的可执行 PL/SQL 语句都放在这一部分，该部分执行命令并操作变量。
+其他的 PL/SQL 块可以作为子块嵌套在该部分。 PL/SQL 块的执行部分是必选的。注
+意 END 关键字后面用分号结尾。
+③ 异常处理部分：该部分是可选的，该部分用 EXCEPTION 关键字把可执行部分分成两
+个小部分，之前的程序是正常运行的程序，一旦出现异常就跳转到异常部分执行。
+PL/SQL 是一种编程语言，与 Java 和 C#一样，除了有自身独有的数据类型、变量声明和赋
+值以及流程控制语句外， PL/SQL 还有自身的语言特性：
+PL/SQL 对大小写不敏感，为了良好的程序风格，开发团队都会选择一个合适的编码标准。
+比如有的团队规定：关键字全部大些，其余的部分小写。
+PL/SQL 块中的每一条语句都必须以分号结束， SQL 语句可以是多行的，但分号表示该语
+句结束。一行中可以有多条 SQL 语句，他们之间以分号分隔，但是不推荐一行中写多条语
+句。
+PL/SQL 中的特殊符号说明：
+类型      符号 说明
+赋值运算符 :=         Java 和 C#中都是等号， PL/SQL 的赋值是： =
+特殊字符
+           ||         字符串连接操作符。
+           --         PL/SQL 中的单行注释。
+         /*,*/        PL/SQL 中的多行注释，多行注释不能嵌套。
+         <<,>>        标签分隔符。只为了标识程序特殊位置。
+           ..         范围操作符，比如： 1..5 标识从１到５
+算术运算符
+        +， -， *， / 基本算术运算符。
+          **          求幂操作，比如： 3**2=9
+关系运算符
+       >， <,>=,<=,=  基本关系运算符， =表示相等关系，不是赋值。
+           <>,!=      不等关系。
+逻辑运算符 AND,OR,NOT 逻辑运算符。
+
+变量声明
+PL/SQL 支持 SQL 中的数据类型， PL/SQL 中正常支持 NUMBER,VARCHAR2,DATE 等 Oracle
+SQL 数据类型。声明变量必须指明变量的数据类型，也可以声明变量时对变量初始化，变量
+声明必须在声明部分。声明变量的语法是：
+语法格式：声明变量
+变量名 数据类型[ :=初始值]
+语法解析：
+数据类型如果需要长度，可以用括号指明长度，比如： varchar2(20)。
+代码演示：声明变量
+DECLARE
+  sname VARCHAR2(20) :='jerry'; ①
+BEGIN
+  sname:=sname||' and tom'; ②
+  dbms_output.put_line(sname); ③        (set serveroutput on)
+END;
+
+
+声明常量
+常量在声明时赋予初值，并且在运行时不允许重新赋值。使用 CONSTANT 关键字声明常
+量。
+代码演示：声明常量
+DECLARE
+  pi CONSTANT number :=3.14; --圆周率长值 ①
+  r number DEFAULT 3; --圆的半径默认值3 ②
+  area number; --面积。
+BEGIN
+  area:=pi*r*r; --计算面积
+  dbms_output.put_line(area); --输出圆的面积
+END;
+
+
+
+标量数据类型
+标量数据类型的变量只有一个值，且内部没有分量。标量数据类型包括数字型，字符型，
+日期型和布尔型。这些类型有的是 Oracle SQL 中定义的数据类型，有的是 PL/SQL 自身附加
+的数据类型。字符型和数字型又有子类型，子类型只与限定的范围有关，比如 NUMBER 类
+型可以表示整数，也可以表示小数，而其子类型 POSITIVE 只表示正整数。
+类型 说明
+VARCHAR2(长度)
+可变长度字符串， Oracle SQL 定义的数据类型，在 PL/SQL 中使用时最
+常 32767 字节。在 PL/SQL 中使用没有默认长度，因此必须指定。
+NUMBER(精度，小数) Oracle SQL 定义的数据类型。
+DATE Oracle SQL 定义的日期类型。
+TIMESTAMP Oracle SQL 定义的日期类型。
+CHAR(长度) Oracle SQL 定义的日期类型，固定长度字符，最长 32767 字节，默认
+长度是 1，如果内容不够用空格代替。
+LONG
+Oracle SQL 定义的数据类型，变长字符串基本类型，最长 32760 字节。
+在 Oracle SQL 中最长 2147483647 字节。
+BOOLEAN PL/SQL 附加的数据类型，逻辑值为 TRUE、 FALSE、 NULL
+BINARY_INTEGER PL/SQL 附加的数据类型，介于-231 和 231 之间的整数。
+PLS_INTEGER
+PL/SQL 附加的数据类型，介于 -231 和 231 之间的整数。类似于
+BINARY_INTEGER，只是 PLS_INTEGER 值上的运行速度更快。
+NATURAL
+PL/SQL 附加的数据类型， BINARY_INTEGER 子类型，表示从 0 开始的
+自然数。
+NATURALN 与 NATURAL 一样，只是要求 NATURALN 类型变量值不能为 NULL。
+POSITIVE PL/SQL 附加的数据类型， BINARY_INTEGER 子类型，正整数。
+POSITIVEN 与 POSITIVE 一样，只是要求 POSITIVE 的变量值不能为 NULL。
+REAL Oracle SQL 定义的数据类型， 18 位精度的浮点数
+INT,INTEGER,SMALLINT Oracle SQL 定义的数据类型， NUMBERDE 的子类型， 38 位精度整数。
+SIGNTYPE PL/SQL 附加的数据类型， BINARY_INTEGER 子类型。值有： 1、 -1、 0。
+STRING 与 VARCHAR2 相同
+
+
+属性数据类型
+当声明一个变量的值是数据库中的一行或者是数据库中某列时，可以直接使用属性类型
+来声明。 Oracle 中存在两种属性类型： %TYPE 和%ROWTYPE。
+  % ROWTYPE
+引用数据库表中的一行作为数据类型，即 RECORD 类型（记录类型），是 PL/SQL 附加的
+数据类型。表示一条记录，就相当于 C#中的一个对象。可以使用“ .”来访问记录中的属性。
+代码演示：
+DECLARE
+  myemp EMP%ROWTYPE; ①
+BEGIN
+  SELECT * INTO myemp FROM emp WHERE empno=7934; ②
+  dbms_output.put_line(myemp.ename); ③
+END;
+
+代码解析：
+① 声明一个 myemp 对象，该对象表示 EMP 表中的一行。
+② 从 EMP 表中查询一条记录放入 myemp 对象中。
+③ 访问该对象的属性可以使用“ .”。
+
+%TYPE
+引用某个变量或者数据库的列的类型作为某变量的数据类型。
+代码演示：%TYPE 应用
+DECLARE
+  sal emp.sal%TYPE; ①
+  mysal number(4):=3000;
+  totalsal mysal%TYPE; ②
+BEGIN
+  SELECT SAL INTO sal FROM emp WHERE empno=7934;
+  totalsal:=sal+mysal;
+  dbms_output.put_line(totalsal);
+END;
+
+declare
+  stuid  student.sid%TYPE;
+  stusex student.ssex%TYPE;
+begin
+  select sid,ssex into stuid,stusex
+  from student where sname='&姓名';
+  dbms_output.put_line(stuid||':'||stusex);
+end;
+
+
+
+
+
+代码解析：
+① 定义变量 sal 为 emp 表中 sal 列的类型。
+② 定义 totalsal 是变量 mysal 的类型。
+%TYPE 可以引用表中的某列作的类型为变量的数据类型，也可以引用某变量的类型作为
+新变量的数据类型。
+
+
+IF 条件 THEN
+--条件结构体
+END IF;
+
+IF 条件 THEN
+--条件成立结构体
+ELSE
+--条件不成立结构体
+END IF;
+
+IF 条件 1 THEN
+--条件 1 成立结构体
+ELSIF 条件 2 THEN
+--条件 2 成立结构体
+ELSE
+--以上条件都不成立结构体
+END IF;
+
+范例:
+
+DECLARE
+  newSal emp.sal % TYPE;
+BEGIN
+  SELECT sal INTO newSal FROM emp
+  WHERE ename='JAMES';
+  IF newSal>900 THEN ①
+    UPDATE emp
+    SET comm=800
+    WHERE ename='JAMES';
+  END IF;
+  COMMIT ; ②
+END;
+
+DECLARE
+  v_grade CHAR(1):=UPPER('&grade');
+  p_grade VARCHAR(20) ;
+BEGIN
+  if v_grade='A' then
+    dbms_output.put_line('优秀');
+  elsif v_grade='B' then
+    dbms_output.put_line('良好');
+  elsif v_grade='C' then
+    dbms_output.put_line('中等');
+  else
+    dbms_output.put_line('差');
+  end if;
+END;
+
+
+WHILE 条件 LOOP
+--循环体
+END LOOP;
+
+DECLARE
+  counter number(3):=0;
+  sumResult number:=0;
+BEGIN
+  WHILE counter<100 LOOP
+    counter := counter+1;
+    sumResult := sumResult+counter;
+  END LOOP;
+  dbms_output.put_line('result is :'||sumResult);
+END;
+
+FOR 循环变量 IN [REVERSE] 循环下限..循环上限 LOOP LOOP
+--循环体
+END LOOP;
+
+DECLARE
+  counter number(3):=0;
+  sumResult number:=0;
+BEGIN
+  FOR counter IN 1..100 LOOP
+    sumResult := sumResult+counter;
+  END LOOP;
+  dbms_output.put_line('result is :'||sumResult);
+END;
+
+
+
+
+
+PL/SQL 的异常处理
+在程序运行时出现的错误，称为异常。发生异常后，语句将停止执行， PL/SQL 引擎立
+即将控制权转到 PL/SQL 块的异常处理部分。异常处理机制简化了代码中的错误检测。 PL/SQL
+中任何异常出现时，每一个异常都对应一个异常码和异常信息。
+
+  预定义异常
+为了 Oracle 开发和维护的方便，在 Oracle 异常中，为常见的异常码定义了对应的异常
+名称，称为预定义异常，常见的预定义异常有：
+异常名称           异常码        描述
+DUP_VAL_ON_INDEX ORA-00001      试图向唯一索引列插入重复值
+INVALID_CURSOR   ORA-01001      试图进行非法游标操作。
+INVALID_NUMBER   ORA-01722      试图将字符串转换为数字
+NO_DATA_FOUND    ORA-01403      SELECT INTO 语句中没有返回任何记录。
+TOO_MANY_ROWS    ORA-01422      SELECT INTO 语句中返回多于 1 条记录。
+ZERO_DIVIDE      ORA-01476      试图用 0 作为除数。
+CURSOR_ALREADY_  OPEN ORA-06511 试图打开一个已经打开的游标
+
+PL/SQL 中用 EXCEPTION 关键字开始异常处理。具体语法是：
+语法格式：异常处理
+BEGIN
+--可执行部分
+EXCEPTION -- 异常处理开始
+WHEN 异常名 1 THEN
+--对应异常处理
+WHEN 异常名 2 THEN
+--对应异常处理
+……
+WHEN OTHERS THEN
+--其他异常处理
+END;
+语法解析：
+异常发生时，进入异常处理部分，具体的异常与若干个 WHEN 子句中指明的异常名匹
+配，匹配成功就进入对应的异常处理部分，如果对应不成功，则进入 OTHERS 进行处理。
+案例    ：异常处理
+代码演示：异常处理
+DECLARE
+  newSal emp.sal % TYPE;
+BEGIN
+  SELECT sal INTO newSal FROM emp;
+EXCEPTION
+  WHEN TOO_MANY_ROWS THEN
+    dbms_output.put_line('返回的记录太多了');
+  WHEN OTHERS THEN
+    dbms_output.put_line('未知异常');
+END;
+返回的记录太多了
+
+
+权限：
+
+　　create session
+
+　　create table
+
+　　unlimited tablespace
+
+　　connect
+
+　　resource
+
+　　dba
+
+　　例：
+
+　　#sqlplus /nolog
+
+　　SQL> conn / as sysdba;
+
+　　SQL>create user username identified by password
+
+　　SQL> grant dba to username;
+
+　　SQL> conn username/password
+
+　　SQL> select * from user_sys_privs;
+
+　　我们将从创建Oracle用户权限表开始谈起，然后讲解登陆等一般性动作，使大家对Oracle用户权限表有个深入的了解。
+
+　　一、创建
+
+　　sys;//系统管理员，拥有最高权限
+
+　　system;//本地管理员，次高权限
+
+　　scott;//普通用户，密码默认为tiger,默认未解锁
+
+　　二、登陆
+
+　　sqlplus / as sysdba;//登陆sys帐户
+
+　　sqlplus sys as sysdba;//同上
+
+　　sqlplus scott/tiger;//登陆普通用户scott
+
+　　三、管理用户
+
+　　create user zhangsan;//在管理员帐户下，创建用户zhangsan
+
+　　alert user zhangsan identified by tiger;//修改密码
+
+　　四，授予权限
+
+　　1、默认的普通用户scott默认未解锁，不能进行那个使用，新建的用户也没有任何权限，必须授予权限
+
+　　
+
+　　grant create session to zhangsan;//授予zhangsan用户创建session的权限，即登陆权限
+
+　　grant unlimited tablespace to zhangsan;//授予zhangsan用户使用表空间的权限
+
+　　grant create table to zhangsan;//授予创建表的权限
+
+　　grante drop table to zhangsan;//授予删除表的权限
+
+　　grant insert table to zhangsan;//插入表的权限
+
+　　grant update table to zhangsan;//修改表的权限
+
+　　grant all to public;//这条比较重要，授予所有权限(all)给所有用户(public)
+
+　　2、oralce对权限管理比较严谨，普通用户之间也是默认不能互相访问的，需要互相授权
+
+　　
+
+　　grant select on tablename to zhangsan;//授予zhangsan用户查看指定表的权限
+
+　　grant drop on tablename to zhangsan;//授予删除表的权限
+
+　　grant insert on tablename to zhangsan;//授予插入的权限
+
+　　grant update on tablename to zhangsan;//授予修改表的权限
+
+　　grant insert(id) on tablename to zhangsan;
+
+　　grant update(id) on tablename to zhangsan;//授予对指定表特定字段的插入和修改权限，注意，只能是insert和update
+
+　　grant alert all table to zhangsan;//授予zhangsan用户alert任意表的权限
+
+　　五、撤销权限
+
+　　基本语法同grant,关键字为revoke
+
+　　六、查看权限
+
+　　select * from user_sys_privs;//查看当前用户所有权限
+
+　　select * from user_tab_privs;//查看所用用户对表的权限
+
+　　七、操作表的用户的表
+
+　　
+
+　　select * from zhangsan.tablename
+
+　　八、权限传递
+
+　　即用户A将权限授予B，B可以将操作的权限再授予C，命令如下：
+
+　　grant alert table on tablename to zhangsan with admin option;//关键字 with admin option
+
+　　grant alert table on tablename to zhangsan with grant option;//关键字 with grant option效果和admin类似
+
+　　九、角色
+
+　　角色即权限的集合，可以把一个角色授予给用户
+
+　　create role myrole;//创建角色
+
+　　grant create session to myrole;//将创建session的权限授予myrole
+
+　　grant myrole to zhangsan;//授予zhangsan用户myrole的角色
+
+　　drop role myrole;删除角色

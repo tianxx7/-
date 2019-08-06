@@ -1,0 +1,1526 @@
+1 异常处理概念
+1.1 预定义的异常处理
+1.2 非预定义的异常处理
+1.3 用户自定义的异常处理
+1.4  用户定义的异常处理
+2 异常错误传播
+2.1 在执行部分引发异常错误
+2.2 在声明部分引发异常错误
+3 异常错误处理编程
+4  在 PL/SQL 中使用 SQLCODE, SQLERRM异常处理函数
+即使是写得最好的PL/SQL程序也会遇到错误或未预料到的事件。一个优秀的程序都应该能够正确处理各种出错情况，并尽可能从错误中恢复。任何ORACLE错误（报告为ORA-xxxxx形式的Oracle错误号）、PL/SQL运行错误或用户定义条件（不一写是错误），都可以。当然了，PL/SQL编译错误不能通过PL/SQL异常处理来处理，因为这些错误发生在PL/SQL程序执行之前。
+ORACLE 提供异常情况(EXCEPTION)和异常处理(EXCEPTION HANDLER)来实现错误处理。
+1 异常处理概念
+异常情况处理(EXCEPTION)是用来处理正常执行过程中未预料的事件,程序块的异常处理预定义的错误和自定义错误,由于PL/SQL程序块一旦产生异常而没有指出如何处理时,程序就会自动终止整个程序运行.
+有三种类型的异常错误：
+    1． 预定义 ( Predefined )错误
+  ORACLE预定义的异常情况大约有24个。对这种异常情况的处理，无需在程序中定义，由ORACLE自动将其引发。
+    2． 非预定义 ( Predefined )错误
+   即其他标准的ORACLE错误。对这种异常情况的处理，需要用户在程序中定义，然后由ORACLE自动将其引发。
+    3． 用户定义(User_define) 错误
+程序执行过程中，出现编程人员认为的非正常情况。对这种异常情况的处理，需要用户在程序中定义，然后显式地在程序中将其引发。
+异常处理部分一般放在 PL/SQL 程序体的后半部,结构为:
+EXCEPTION
+   WHEN first_exception THEN  
+   WHEN second_exception THEN  
+   WHEN OTHERS THEN  
+END;
+ 
+异常处理可以按任意次序排列,但 OTHERS 必须放在最后.
+1.1 预定义的异常处理
+   预定义说明的部分 ORACLE 异常错误
+错误号
+异常错误信息名称
+说明
+ORA-0001
+Dup_val_on_index
+违反了唯一性限制
+ORA-0051
+Timeout-on-resource
+在等待资源时发生超时
+ORA-0061
+Transaction-backed-out
+由于发生死锁事务被撤消
+ORA-1001
+Invalid-CURSOR
+试图使用一个无效的游标
+ORA-1012
+Not-logged-on
+没有连接到ORACLE
+ORA-1017
+Login-denied
+无效的用户名/口令
+ORA-1403
+No_data_found
+SELECT INTO没有找到数据
+ORA-1422
+Too_many_rows
+SELECT INTO 返回多行
+ORA-1476
+Zero-divide
+试图被零除
+ORA-1722
+Invalid-NUMBER
+转换一个数字失败
+ORA-6500
+Storage-error
+内存不够引发的内部错误
+ORA-6501
+Program-error
+内部错误
+ORA-6502
+Value-error
+转换或截断错误
+ORA-6504
+Rowtype-mismatch
+宿主游标变量与 PL/SQL变量有不兼容行类型
+ORA-6511
+CURSOR-already-OPEN
+试图打开一个已处于打开状态的游标
+ORA-6530
+Access-INTO-null
+试图为null 对象的属性赋值
+ORA-6531
+Collection-is-null
+试图将Exists 以外的集合( collection)方法应用于一个null pl/sql 表上或varray上
+ORA-6532
+Subscript-outside-limit
+对嵌套或varray索引得引用超出声明范围以外
+ORA-6533
+Subscript-beyond-count
+对嵌套或varray 索引得引用大于集合中元素的个数.
+对这种异常情况的处理，只需在PL/SQL块的异常处理部分，直接引用相应的异常情况名，并对其完成相应的异常错误处理即可。
+例1：更新指定员工工资，如工资小于1500，则加100；
+ 
+DECLARE
+   v_empno employees.employee_id%TYPE := &empno;
+   v_sal   employees.salary%TYPE;
+BEGIN
+   SELECT salary INTO v_sal FROM employees WHERE employee_id = v_empno;
+   IF v_sal<=1500 THEN
+        UPDATE employees SET salary = salary + 100 WHERE employee_id=v_empno;
+        DBMS_OUTPUT.PUT_LINE('编码为'||v_empno||'员工工资已更新!');    
+   ELSE
+        DBMS_OUTPUT.PUT_LINE('编码为'||v_empno||'员工工资已经超过规定值!');
+   END IF;
+EXCEPTION
+   WHEN NO_DATA_FOUND THEN 
+      DBMS_OUTPUT.PUT_LINE('数据库中没有编码为'||v_empno||'的员工');
+   WHEN TOO_MANY_ROWS THEN
+      DBMS_OUTPUT.PUT_LINE('程序运行错误!请使用游标');
+   WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE(SQLCODE||'---'||SQLERRM);
+END;
+ 
+1.2 非预定义的异常处理
+对于这类异常情况的处理，首先必须对非定义的ORACLE错误进行定义。步骤如下：
+1. 在PL/SQL 块的定义部分定义异常情况：
+<异常情况>  EXCEPTION;
+2. 将其定义好的异常情况，与标准的ORACLE错误联系起来，使用EXCEPTION_INIT语句：
+PRAGMA EXCEPTION_INIT(<异常情况>, <错误代码>);
+3. 在PL/SQL 块的异常情况处理部分对异常情况做出相应的处理。
+例2：删除指定部门的记录信息，以确保该部门没有员工。
+INSERT INTO departments VALUES(50, 'FINANCE', 'CHICAGO');
+
+DECLARE
+   v_deptno departments.department_id%TYPE := &deptno;
+   deptno_remaining EXCEPTION;
+   PRAGMA EXCEPTION_INIT(deptno_remaining, -2292);
+  
+BEGIN
+   DELETE FROM departments WHERE department_id = v_deptno;
+EXCEPTION
+   WHEN deptno_remaining THEN
+      DBMS_OUTPUT.PUT_LINE('违反数据完整性约束!');
+   WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE(SQLCODE||'---'||SQLERRM);
+END;
+ 
+1.3 用户自定义的异常处理
+当与一个异常错误相关的错误出现时，就会隐含触发该异常错误。用户定义的异常错误是通过显式使用 RAISE 语句来触发。当引发一个异常错误时，控制就转向到 EXCEPTION块异常错误部分，执行错误处理代码。
+对于这类异常情况的处理，步骤如下：
+1． 在PL/SQL 块的定义部分定义异常情况：
+<异常情况>  EXCEPTION;
+2． RAISE <异常情况>；
+3． 在PL/SQL 块的异常情况处理部分对异常情况做出相应的处理。
+例3：更新指定员工工资，增加100；
+DECLARE
+   v_empno employees.employee_id%TYPE :=&empno;
+   no_result  EXCEPTION;
+BEGIN
+   UPDATE employees SET salary = salary+100 WHERE employee_id = v_empno;
+   IF SQL%NOTFOUND THEN
+      RAISE no_result;
+   END IF;
+EXCEPTION
+   WHEN no_result THEN
+      DBMS_OUTPUT.PUT_LINE('你的数据更新语句失败了!');
+   WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE(SQLCODE||'---'||SQLERRM);
+END;
+ 
+1.4  用户定义的异常处理
+调用DBMS_STANDARD(ORACLE提供的包)包所定义的RAISE_APPLICATION_ERROR过程，可以重新定义异常错误消息，它为应用程序提供了一种与ORACLE交互的方法。
+RAISE_APPLICATION_ERROR 的语法如下：
+    RAISE_APPLICATION_ERROR(error_number,error_message,[keep_errors] );
+    这里的error_number 是从 –20,000 到 –20,999 之间的参数，
+    error_message 是相应的提示信息(< 2048 字节)，
+keep_errors 为可选，如果keep_errors =TRUE ,则新错误将被添加到已经引发的错误列表中。如果keep_errors=FALSE(缺省),则新错误将替换当前的错误列表。
+例4：创建一个函数get_salary, 该函数检索指定部门的工资总和，其中定义了-20991和-20992号错误，分别处理参数为空和非法部门代码两种错误：
+CREATE TABLE errlog(
+  Errcode NUMBER,
+  Errtext CHAR(40));
+
+CREATE OR REPLACE FUNCTION get_salary(p_deptno NUMBER)
+RETURN NUMBER
+AS
+  v_sal NUMBER;
+BEGIN
+  IF p_deptno IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20991, ’部门代码为空’);
+  ELSIF p_deptno<0 THEN
+    RAISE_APPLICATION_ERROR(-20992, ’无效的部门代码’);
+  ELSE
+    SELECT SUM(employees.salary) INTO v_sal FROM employees
+    WHERE employees.department_id=p_deptno;
+    RETURN v_sal;
+  END IF;
+END;
+
+DECLARE
+  V_salary NUMBER(7,2);
+  V_sqlcode NUMBER;
+  V_sqlerr VARCHAR2(512);
+  Null_deptno EXCEPTION;
+  Invalid_deptno EXCEPTION;
+  PRAGMA EXCEPTION_INIT(null_deptno,-20991);
+  PRAGMA EXCEPTION_INIT(invalid_deptno, -20992);
+BEGIN
+  V_salary :=get_salary(10);
+  DBMS_OUTPUT.PUT_LINE('10号部门工资：' || TO_CHAR(V_salary));
+
+  BEGIN
+    V_salary :=get_salary(-10);
+  EXCEPTION
+    WHEN invalid_deptno THEN
+      V_sqlcode :=SQLCODE;
+      V_sqlerr  :=SQLERRM;
+      INSERT INTO errlog(errcode, errtext)
+      VALUES(v_sqlcode, v_sqlerr);
+      COMMIT;
+  END inner1;
+
+  V_salary :=get_salary(20);
+  DBMS_OUTPUT.PUT_LINE('部门号为20的工资为：'||TO_CHAR(V_salary));
+
+  BEGIN
+    V_salary :=get_salary(NULL);
+  END inner2;
+
+  V_salary := get_salary(30);
+  DBMS_OUTPUT.PUT_LINE('部门号为30的工资为：'||TO_CHAR(V_salary));
+
+  EXCEPTION
+    WHEN null_deptno THEN
+      V_sqlcode :=SQLCODE;
+      V_sqlerr  :=SQLERRM;
+      INSERT INTO errlog(errcode, errtext) VALUES(v_sqlcode, v_sqlerr);
+      COMMIT;
+    WHEN OTHERS THEN
+         DBMS_OUTPUT.PUT_LINE(SQLCODE||'---'||SQLERRM);
+END outer;
+ 
+例5：定义触发器，使用RAISE_APPLICATION_ERROR阻止没有员工姓名的新员式记录插入：
+CREATE OR REPLACE TRIGGER tr_insert_emp
+BEFORE INSERT ON employees
+FOR EACH ROW
+BEGIN
+  IF :new.first_name IS NULL OR :new.last_name is null THEN
+    RAISE_APPLICATION_ERROR(-20000,'Employee must have a name.');
+  END IF;
+END;
+ 
+2 异常错误传播
+    由于异常错误可以在声明部分和执行部分以及异常错误部分出现，因而在不同部分引发的异常错误也不一样。
+2.1 在执行部分引发异常错误
+    当一个异常错误在执行部分引发时，有下列情况：
+l 如果当前块对该异常错误设置了处理，则执行它并成功完成该块的执行，然后控制转给包含块。
+l 如果没有对当前块异常错误设置定义处理器，则通过在包含块中引发它来传播异常错误。然后对该包含块执行步骤1)。
+2.2 在声明部分引发异常错误
+    如果在声明部分引起异常情况，即在声明部分出现错误，那么该错误就能影响到其它的块。比如在有如下的PL/SQL程序：
+DECLARE
+    name varchar2(12):='EricHu';
+    其它语句
+BEGIN
+    其它语句
+EXCEPTION
+    WHEN OTHERS THEN
+    其它语句
+END;
+ 
+     例子中，由于Abc number(3)=’abc’; 出错，尽管在EXCEPTION中说明了WHEN OTHERS THEN语句，但WHEN OTHERS THEN也不会被执行。 但是如果在该错误语句块的外部有一个异常错误，则该错误能被抓住，如：
+BEGIN
+    DECLARE
+    name varchar2(12):='EricHu';
+    其它语句
+   BEGIN
+    其它语句
+   EXCEPTION
+    WHEN OTHERS THEN
+    其它语句
+    END;
+EXCEPTION
+WHEN OTHERS THEN
+    其它语句
+END;
+ 
+3 异常错误处理编程
+    在一般的应用处理中，建议程序人员要用异常处理，因为如果程序中不声明任何异常处理，则在程序运行出错时，程序就被终止，并且也不提示任何信息。下面是使用系统提供的异常来编程的例子。
+5.4  在 PL/SQL 中使用 SQLCODE, SQLERRM异常处理函数
+    由于ORACLE 的错信息最大长度是512字节，为了得到完整的错误提示信息，我们可用 SQLERRM和 SUBSTR 函数一起得到错误提示信息，方便进行错误，特别是如果WHEN OTHERS异常处理器时更为方便。
+SQLCODE  返回遇到的Oracle错误号,
+SQLERRM  返回遇到的Oracle错误信息.
+如:  SQLCODE=-100   è SQLERRM=’no_data_found ‘
+SQLCODE=0      è SQLERRM=’normal, successfual completion’
+例6. 将ORACLE错误代码及其信息存入错误代码表
+CREATE TABLE errors (errnum NUMBER(4), errmsg VARCHAR2(100));
+
+DECLARE
+   err_msg  VARCHAR2(100);
+BEGIN
+  
+   FOR err_num IN -100 .. 0 LOOP
+      err_msg := SQLERRM(err_num);
+      INSERT INTO errors VALUES(err_num, err_msg);
+   END LOOP;
+END;
+DROP TABLE errors;
+ 
+例7. 查询ORACLE错误代码；
+BEGIN
+   INSERT INTO employees(employee_id, first_name,last_name,hire_date,department_id)
+   VALUES(2222, 'Eric','Hu', SYSDATE, 20);
+   DBMS_OUTPUT.PUT_LINE('插入数据记录成功!');
+  
+   INSERT INTO employees(employee_id, first_name,last_name,hire_date,department_id)
+   VALUES(2222, '胡','勇', SYSDATE, 20);
+   DBMS_OUTPUT.PUT_LINE('插入数据记录成功!');
+EXCEPTION
+   WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE(SQLCODE||'---'||SQLERRM);
+END;
+ 
+例8. 利用ORACLE错误代码，编写异常错误处理代码；
+DECLARE
+   empno_remaining EXCEPTION;
+   PRAGMA EXCEPTION_INIT(empno_remaining, -1);
+  
+BEGIN
+   INSERT INTO employees(employee_id, first_name,last_name,hire_date,department_id)
+   VALUES(3333, 'Eric','Hu', SYSDATE, 20);
+   DBMS_OUTPUT.PUT_LINE('插入数据记录成功!');
+  
+   INSERT INTO employees(employee_id, first_name,last_name,hire_date,department_id)
+   VALUES(3333, '胡','勇',SYSDATE, 20);
+   DBMS_OUTPUT.PUT_LINE('插入数据记录成功!');
+EXCEPTION
+   WHEN empno_remaining THEN
+      DBMS_OUTPUT.PUT_LINE('违反数据完整性约束!');
+   WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE(SQLCODE||'---'||SQLERRM);
+END;
+ 
+ 
+1、异常的优点
+　　
+　　如果没有异常，在程序中，应当检查每个命令的成功还是失败，如
+　　BEGIN
+　　SELECT ...
+　　-- check for ’no data found’ error
+　　SELECT ...
+　　-- check for ’no data found’ error
+　　SELECT ...
+　　-- check for ’no data found’ error
+　　这种实现的方法缺点在于错误处理没有与正常处理分开，可读性差，使用异常，可以方便处理错误，而且异常处理程序与正常的事务逻辑分开，提高了可读性，如
+　　BEGIN
+　　SELECT ...
+　　SELECT ...
+　　SELECT ...
+　　...
+　　EXCEPTION
+　　WHEN NO_DATA_FOUND THEN -- catches all ’no data found’ errors
+　　
+　　2、异常的分类
+　　
+　　有两种类型的异常，一种为内部异常，一种为用户自定义异常，内部异常是执行期间返回到PL/SQL块的ORACLE错误或由PL/SQL代码的某操作引起的错误，如除数为零或内存溢出的情况。用户自定义异常由开发者显示定义，在PL/SQL块中传递信息以控制对于应用的错误处理。
+　　
+　　每当PL/SQL违背了ORACLE原则或超越了系统依赖的原则就会隐式的产生内部异常。因为每个ORACLE错误都有一个号码并且在PL/SQL中异常通过名字处理，ORACLE提供了预定义的内部异常。如SELECT INTO 语句不返回行时产生的ORACLE异常NO_DATA_FOUND。对于预定义异常，现将最常用的异常列举如下：
+　　exception　 oracle error　 sqlcode value　 condition
+　　no_data_found　　　　　　　　　　　　　 ora-01403　 +100　 select into 语句没有符合条件的记录返回
+　　too_many_rows　 ora-01422　 -1422　 select into 语句符合条件的记录有多条返回
+　　dup_val_on_index　 ora-00001　 -1　 对于数据库表中的某一列，该列已经被限制为唯一索引，程序试图存储两个重复的值
+　　value_error　 ora-06502　 -6502　 在转换字符类型，截取或长度受限时，会发生该异常，如一个字符分配给一个变量，而该变量声明的长度比该字符短，就会引发该异常
+　　storage_error　 ora-06500　 -6500　 内存溢出
+　　zero_divide　 ora-01476　 -1476　 除数为零
+　　case_not_found　 ora-06592　 -6530　 对于选择case语句，没有与之相匹配的条件，同时，也没有else语句捕获其他的条件
+　　cursor_already_open　 ora-06511　 -6511　 程序试图打开一个已经打开的游标
+　　timeout_on_resource　 ora-00051　 -51　 系统在等待某一资源，时间超时
+　　
+　　如果要处理未命名的内部异常，必须使用OTHERS异常处理器或PRAGMA EXCEPTION_INIT 。PRAGMA由编译器控制，或者是对于编译器的注释。PRAGMA在编译时处理，而不是在运行时处理。EXCEPTION_INIT告诉编译器将异常名与ORACLE错误码结合起来，这样可以通过名字引用任意的内部异常，并且可以通过名字为异常编写一适当的异常处理器。
+　　
+　　在子程序中使用EXCEPTION_INIT的语法如下：
+　　PRAGMA EXCEPTION_INIT(exception_name, -Oracle_error_number);
+　　
+　　在该语法中，异常名是声明的异常，下例是其用法：
+　　DECLARE
+　　deadlock_detected EXCEPTION;
+　　PRAGMA EXCEPTION_INIT(deadlock_detected, -60);
+　　BEGIN
+　　... -- Some operation that causes an ORA-00060 error
+　　EXCEPTION
+　　WHEN deadlock_detected THEN
+　　-- handle the error
+　　END;
+　　
+　　对于用户自定义异常，只能在PL/SQL块中的声明部分声明异常，异常的名字由EXCEPTION关键字引入：
+　　reserved_loaned Exception
+　　
+　　产生异常后，控制传给了子程序的异常部分，将异常转向各自异常控制块，必须在代码中使用如下的结构处理错误：
+　　Exception
+　　When exception1 then
+　　Sequence of statements;
+　　When exception2 then
+　　Sequence of statements;
+　　When others then
+　　
+　　3、异常的抛出
+　　
+　　由三种方式抛出异常
+　　
+　　1． 通过PL/SQL运行时引擎
+　　
+　　2. 使用RAISE语句
+　　
+　　3. 调用RAISE_APPLICATION_ERROR存储过程
+　　
+　　当数据库或PL/SQL在运行时发生错误时，一个异常被PL/SQL运行时引擎自动抛出。异常也可以通过RAISE语句抛出
+　　RAISE exception_name;
+　　
+　　显式抛出异常是程序员处理声明的异常的习惯用法，但RAISE不限于声明了的异常，它可以抛出任何任何异常。例如，你希望用TIMEOUT_ON_RESOURCE错误检测新的运行时异常处理器，你只需简单的在程序中使用下面的语句：
+　　RAISE TIMEOUT_ON_RESOUCE;
+　　
+　　比如下面一个订单输入的例子，若当订单小于库存数量，则抛出异常，并且捕获该异常，处理异常
+　　DECLARE
+　　inventory_too_low EXCEPTION;
+　　
+　　---其他声明语句
+　　BEGIN
+　　IF order_rec.qty>inventory_rec.qty THEN
+　　RAISE inventory_too_low;
+　　END IF
+　　EXCEPTION
+　　WHEN inventory_too_low THEN
+　　order_rec.staus:='backordered';
+　　END;
+　　
+　　RAISE_APPLICATION_ERROR内建函数用于抛出一个异常并给异常赋予一个错误号以及错误信息。自定义异常的缺省错误号是+1,缺省信息是User_Defined_Exception。RAISE_APPLICATION_ERROR函数能够在pl/sql程序块的执行部分和异常部分调用，显式抛出带特殊错误号的命名异常。　 Raise_application_error(error_number,message[,true,false]))
+　　
+　　错误号的范围是-20,000到-20,999。错误信息是文本字符串，最多为2048字节。TRUE和FALSE表示是添加(TRUE)进错误堆(ERROR STACK)还是覆盖(overwrite)错误堆(FALSE)。缺省情况下是FALSE。
+　　
+　　如下代码所示：
+　　IF product_not_found THEN
+　　RAISE_APPLICATION_ERROR(-20123,'Invald product code' TRUE);
+　　END IF;
+　　
+　　4、异常的处理
+　　
+　　PL/SQL程序块的异常部分包含了程序处理错误的代码，当异常被抛出时，一个异常陷阱就自动发生，程序控制离开执行部分转入异常部分,一旦程序进入异常部分就不能再回到同一块的执行部分。下面是异常部分的一般语法：
+　　EXCEPTION
+　　WHEN exception_name THEN
+　　Code for handing exception_name
+　　[WHEN another_exception THEN
+　　Code for handing another_exception]
+　　[WHEN others THEN
+　　code for handing any other exception.]
+　　
+　　用户必须在独立的WHEN子串中为每个异常设计异常处理代码，WHEN OTHERS子串必须放置在最后面作为缺省处理器处理没有显式处理的异常。当异常发生时，控制转到异常部分，ORACLE查找当前异常相应的WHEN..THEN语句，捕捉异常，THEN之后的代码被执行，如果错误陷阱代码只是退出相应的嵌套块，那么程序将继续执行内部块END后面的语句。如果没有找到相应的异常陷阱，那么将执行WHEN OTHERS。在异常部分WHEN 子串没有数量限制。
+　　EXCEPTION
+　　WHEN inventory_too_low THEN
+　　order_rec.staus:='backordered';
+　　replenish_inventory(inventory_nbr=>
+　　inventory_rec.sku,min_amount=>order_rec.qty-inventory_rec.qty);
+　　WHEN discontinued_item THEN
+　　--code for discontinued_item processing
+　　WHEN zero_divide THEN
+　　--code for zero_divide
+　　WHEN OTHERS THEN
+　　--code for any other exception
+　　END;
+　　
+　　当异常抛出后，控制无条件转到异常部分，这就意味着控制不能回到异常发生的位置，当异常被处理和解决后，控制返回到上一层执行部分的下一条语句。
+　　BEGIN
+　　DECLARE
+　　bad_credit exception;
+　　BEGIN
+　　RAISE bad_credit;
+　　--发生异常，控制转向；
+　　EXCEPTION
+　　WHEN bad_credit THEN
+　　dbms_output.put_line('bad_credit');
+　　END;
+　　--bad_credit异常处理后，控制转到这里
+　　EXCEPTION
+　　WHEN OTHERS THEN
+　　
+　　--控制不会从bad_credit异常转到这里
+　　
+　　--因为bad_credit已被处理
+　　
+　　END;
+　　
+　　当异常发生时，在块的内部没有该异常处理器时，控制将转到或传播到上一层块的异常处理部分。
+　　
+　　BEGIN
+　　DECLARE ---内部块开始
+　　
+　　bad_credit exception;
+　　BEGIN
+　　RAISE bad_credit;
+　　
+　　--发生异常，控制转向；
+　　EXCEPTION
+　　WHEN ZERO_DIVIDE THEN --不能处理bad_credite异常
+　　dbms_output.put_line('divide by zero error');
+　　
+　　END --结束内部块
+　　
+　　--控制不能到达这里，因为异常没有解决；
+　　
+　　--异常部分
+　　
+　　EXCEPTION
+　　WHEN OTHERS THEN
+　　--由于bad_credit没有解决，控制将转到这里
+　　END;
+　　
+　　5、异常的传播
+　　
+　　没有处理的异常将沿检测异常调用程序传播到外面，当异常被处理并解决或到达程序最外层传播停止。在声明部分抛出的异常将控制转到上一层的异常部分。
+　　
+　　BEGIN
+　　executable statements
+　　BEGIN
+　　today DATE:='SYADATE'; --ERRROR
+　　
+　　BEGIN --内部块开始
+　　dbms_output.put_line('this line will not execute');
+　　EXCEPTION
+　　WHEN OTHERS THEN
+　　
+　　--异常不会在这里处理
+　　
+　　END;--内部块结束
+　　EXCEPTION
+　　WHEN OTHERS THEN
+　　
+　　处理异常
+　　
+　　END
+
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+
+处理 oracle 系统自动生成系统异常外，可以使用 raise 来手动生成错误。
+l         Raise exception;
+l         Raise package.exception;
+l         Raise;
+以上是 raise 的三种使用方法。第一种用于生成当前程序中定义的异常或在 standard 中的系统异常。
+       Declare
+              Invalid_id exception;
+              Id_values varchar(2);
+       Begin
+              Id_value:=id_for(‘smith’);
+              If substr(id_value,1,1)!=’x’
+              Then
+                     Raise invalid_id;
+              End if;
+       Exception
+              When invalid_id
+              Then
+                     Dbms_output.put_line(‘this is an invalid id!’);
+       End;
+这是一个生成自定义异常的例子，当然也可以生成系统异常：
+       declare
+              employee_id_in number;
+       Begin
+Select employee_id into employee_id_in from employ_list where employee_name=&n;
+If employee_id_in=0
+Then
+       Raise zero_devided;
+End if;
+       Exception
+              When zero_devided
+              Then
+                     Dbms_output.put_line(‘wrong!’);
+       End;
+有一些异常是定义在非标准包中的，如 UTL_FILE ， DBMS_SQL 以及程序员创建的包中异常。可以使用 raise 的第二种用法来生成异常。
+       If day_overdue(isbn_in, browser_in) > 365
+       Then
+              Raise overdue_pkg.book_is_lost
+       End if;
+在最后一种 raise 的形式中，不带任何参数。这种情况只出现在希望将当前的异常传到外部程序时。
+       Exception
+              When no_data_found
+              Then
+                     Raise;
+       End;
+Pl.sql 使用 raise_application_error 过程来生成一个有具体描述的异常。当使用这个过程时，当前程序被中止，输入输出参数被置为原先的值，但任何 DML 对数据库所做的改动将被保留，可以在之后用 rollback 命令回滚。下面是该过程的原型：
+       Procedure raise_application_error(
+       Num binary_integer;
+       Msg varchar2;
+       Keeperrorstack Boolean default false
+)
+其中 num 是在 -20999 到 -20000 之间的任何数字（但事实上， DBMS_OUPUT 和 DBMS_DESCRIBLE 包使用了 -20005 到 -20000 的数字）； msg 是小于 2K 个字符的描述语，任何大于 2K 的字符都将被自动丢弃； keeperrorstack 默认为 false ，是指清空异常栈，再将当前异常入栈，如果指定 true 的话就直接将当前异常压入栈中。
+    CREATE OR REPLACE PROCEDURE raise_by_language (code_in IN PLS_INTEGER)
+    IS
+       l_message error_table.error_string%TYPE;
+    BEGIN
+       SELECT error_string
+         INTO l_message
+         FROM error_table, v$nls_parameters v
+        WHERE error_number = code_in
+          AND string_language = v.VALUE
+          AND v.parameter = 'NLS_LANGUAGE';
+       RAISE_APPLICATION_ERROR (code_in, l_message);
+    END;
+
+
+ORACL内部异常：
+ 
+１：预定义异常 
+用于处理常见的Oracle错误 
+２：非预定义异常 
+用于处理预定义异常所不能处理的Oracle错误 
+３：自定义异常 
+用于处理于Oracle错误无关的其他情况 
+异常处理部分是以关键字EXCEPTION开始的，语法如下： 
+  EXCEPTION 
+    WHEN  exception_Name THEN  --exception_Name为异常的名字 
+      statement1; 
+    WHEN OTHERS THEN 
+  statement1; 
+异常处理部分从关键字EXCEPTION开始，在异常处理部分使用WHEN字句捕捉各种异常，如果有其他未预定义到的异常，使用WHEN OTHERS THEN字句进行捕捉和处理。 
+1、 处理预定义异常，这是系统预定的21种类型 
+  错误代码是负整数，如-51 
+      
+ 
+    
+  Access_info_null（ora-06530） 
+     当访问没有初始化的对象时触发。 
+    
+  Case_not_found(ora-06592) 
+     case过程中when后没有包含必要的条件分支并且没有else子句，则会触发本异常。 
+    
+  Collection_is_null(06531) 
+访问未初始化的集合元素（嵌套表或者varray）。
+    
+  Cursor_already_open(ora-06511) 
+     重新打开已经打开的游标。 
+    
+  Dup_val_on_index(ora-00001) 
+     当中唯一索引所对应的列上键入重复值时。 
+    
+  Invalid_cursor(ora-01001) 
+试图在不合法的游标上执行操作时，譬如没打开游标就提取内容
+    
+  Invalid_number(ora-01722) 
+     当试图将非法的字符串转换为数字类型时。 
+    
+  No_data_found(ora-01403) 
+     执行select into未返回行，或者引用了索引表未初始化的元素时。 
+    
+  Too_many_rows(ora-01422) 
+     执行select into返回超过一行数据时。 
+    
+  Zero_divide(ora-01476) 
+     0作为被除数时。 
+    
+  Subscript_beyond_count(ora-06533) 
+     使用嵌套表或者varray集合时，如果引用下标超过last。 
+    
+Subscript_outside_limit(ora-06532)
+     使用嵌套表或varray集合时，如果引用下标小于first。 
+    
+  Value_error(ora-06502) 
+     在执行赋值操作时，如果变量长度不足以容纳实际数据。 
+    
+  Login_denied(ora-01017) 
+     连接数据库时提供了不正确的用户名或口令。 
+    
+  Not_logged_on(ora-01012) 
+在程序没有连接到oracle数据库时执行plsql代码则会触发。
+    
+  Program_error(ora-06501) 
+     plsql内部问题。 
+    
+  Rowtype_mismatch(ora-06504) 
+     执行赋值操作时，如果宿主游标变量和PLSQL游标变量返回类型不兼容时。 
+    
+  Self_is_null(ora-30625) 
+     使用对象类型时，如果在null实例上调用成员方法。 
+    
+  Storage_error(ora-06500) 
+     超出内存空间或者内存被损坏。 
+    
+  Sys_invalid_rowid（ora-01410） 
+     无效字符串企图转换为rowid类型时。 
+    
+  Timeout_on_resource(ora-00051) 
+     等待资源时出现超时错误。 
+    
+ 
+ 
+2、处理非预定义异常 
+使用非预定义异常包括三步： 
+一：在定义部分定义异常名， 
+二：在异常和Oracle错误之间建立关联， 
+三：在异常处理部分捕捉并处理异常。 
+ 
+ 
+当定义Oracle错误和异常之间的关联关系时，需要使用伪过程EXCEPTION_INIT。 
+ 
+ 
+一：首先的定义部分定义异常； 
+二：使用progmaexception_init(exception_name,exception_number) 在异常和oracle错误之间建立关联， 
+    这时要求用户知道可能出现的错误号（异常函数sqlcode、sqlerrm和raise_application_error）； 
+三：最终在异常处理部分捕捉并处理异常。 
+ 
+  
+ 
+ 
+下面以更新特定雇员的部门号，并处理ORA-02291错误为例，说明使用非预定义异常的方法。示例如下： 
+ 
+ 
+  DECLARE 
+    e_integrity EXCEPTION;  --1、定义部分 
+    PRAGMA EXCEPTION_INIT (e_integrity, -2291);  --2、建立关联关系 
+  BEGIN 
+    UPDATE  emp SET deptno=  &dno WHERE  empno = &eno; 
+  EXCEPTION 
+    WHEN  e_integrity THEN  --3、捕捉处理 
+      DBMS_OUTPUT.PUT_LINE(‘该部门不存在’); 
+  END; 
+   
+ 
+    
+--3、处理自定义异常 
+预定义异常和非预定义异常都与Oracle错误有关，并且当出现Oracle错误时会隐含触发相应异常； 
+而自定义异常与Oracle错误没有任何关联，它是由开发人员为特定情况所定义的异常。 
+ 
+ 
+当使用自定义异常时， 
+一：需要在定义部分（DECLARE）定义异常， 
+二：再执行部分（BEGIN）触发异常（使用RAISE语句）， 
+三：在异常处理部分（EXCEPTION）捕捉并处理异常。 
+ 
+ 
+  declare 
+   myexception exception; 
+  begin 
+   
+if 
+1=0 
+then 
+   
+raise myexception; 
+   
+endif;  
+  exception 
+   
+when 
+ 
+myexception  
+then 
+       dbms_output.put_line('asdf'); 
+  end; 
+    
+注意：不能在同一个block中描述EXCEPTION两次，但是可以描述一个exception在两个不同的block中。异常（exception）是有作用域的，子块的异常不能被当前块所捕捉， 
+ 
+  
+ 
+--４、使用异常函数： 
+Oracle内置函数sqlcode和sqlerrm主要用在others处理器中，分别用来返回oracle的错误代码和错误消息。 
+一般情况下sqlcode返回负数标识的oracle错误代码，除非错误 
+为‘ora-01403：no data found’，此时对应的sqlcode为+100， 
+对于用户自定义的异常，sqlcode返回+1，如果没有异常被触发，sqlcode返回0。 
+  Begin 
+  Exception 
+   When  others then 
+      Dbms_output.put_line(sqlcode||sqlerrm(sqlcode)); 
+  End; 
+    
+ 
+  
+ 
+ 
+Oracle过程raise_application_error用于在plsql应用程序中自定义错误消息。 
+注意该过程只能在数据库端的子程序（过程、函数、包、触发器）中使用，而不能在匿名块和客户端的子程序中使用。 
+语法为raise_application_error(error_number,message[,[true|false]]); 
+其中 
+ 
+error_number用于定义错误号，该错误号必须在-20000到-20999之间的负整数； 
+message用于指定错误消息，并且该消息的长度不 
+能超过2048字节； 
+第三个参数如果为true，则该错误会被放在先前错误堆栈中，如果为false（默认值）则会替代先前所有错误。 
+  IF product_not_found THEN 
+               RAISE_APPLICATION_ERROR(-20123,'Invald product code'  TRUE); 
+  END IF; 
+    
+ 
+  
+ 
+ 
+--５、plsql编译警告： 
+plsql警告可以分为四类： 
+severe：用于 
+检查可能出现的不可预料或者错误结果，例如参数的别名问题； 
+performance：用于检查可能引起的性能问题，例如执行insert操作时为 number列提供了varchar2类型数据； 
+informational：用于检查子程序中的死代码； 
+all：用于检查所有警告。 
+ 
+ 
+为了数据库可以在编 
+译plsql子程序时发出警告信息，需要设置初始化参数plsql_warnings。这个参数不仅可以在系统级或者会话级设置，也可以在alter procedure命令中设置。 
+  Alter {system|session|procedure}  
+  set plsql_warnings= 
+   
+’{enable|disable:{all |performance|severe|informational}}’; 
+    
+ 
+ 
+为了检查是否存在对应警告信息，必须先激活警告检查，然后重新编译子程序， 
+最后使用show errors命令显示警告错误。 
+  create or  replace procedure  my_test 
+  is 
+  begin 
+   if  1=0 then 
+      dbms_output.put_line('test'); 
+   endif;  
+  end; 
+  SQL>  alter procedure  my_test compile plsql_warnings = 'enable:all'; 
+   
+ 
+  Procedure altered 
+   SQL>  show errors; 
+  Errors for  PROCEDURE SYS.MY_TEST: 
+   LINE/COL ERROR 
+  --------  ------------------------- 
+  10/5      PLW-06002: 无法执行的代码 
+    
+ 
+ 
+--6、定义Exception时要注意的一些事项 
+当异常发生时，在块的内部没有该异常处理器时，控制将转到或传播到上一层块的异常处理部分。 
+没有处理的异常将沿检测异常调用程序传播到外层，当异常被处理并解决或到达程序最外层传播停止。在声明部分抛出的异常将控制转到上一层的异常部分。 
+ 
+ 
+用户必须在独立的WHEN子串中为每个异常设计异常处理代码，WHEN OTHERS子串必须放置在最后面作为缺省处理器处理没有显式处理的异常。当异常发生时，控制转到异常部分，ORACLE查找当前异常相应的WHEN..THEN语句，捕捉异常，THEN之后的代码被执行，如果错误陷阱代码只是退出相应的嵌套块，那么程序将继续执行内部块END后面的语句。如果没有找到相应的异常陷阱，那么将执行WHEN OTHERS。在异常部分WHEN 子串没有数量限制。 
+  EXCEPTION 
+   
+WHEN inventory_too_low THEN 
+   
+      ...... 
+   
+WHEN discontinued_item THEN 
+   
+      ...... 
+   
+WHEN zero_divide THEN 
+   
+      ...... 
+   
+WHEN OTHERS THEN 
+   
+      ......  
+ 
+ 
+oracle预定义的异常列表 
+2008-10-30 16:06 
+命名的系统异常         产生原因  
+ACCESS_INTO_NULL         未定义对象  
+CASE_NOT_FOUND         CASE 中若未包含相应的 WHEN ，并且没有设置 ELSE 时  
+COLLECTION_IS_NULL         集合元素未初始化  
+CURSER_ALREADY_OPEN         游标已经打开  
+DUP_VAL_ON_INDEX         唯一索引对应的列上有重复的值  
+INVALID_CURSOR         在不合法的游标上进行操作  
+INVALID_NUMBER         内嵌的 SQL 语句不能将字符转换为数字  
+NO_DATA_FOUND         使用 select into 未返回行，或应用索引表未初始化的元素时  
+TOO_MANY_ROWS         执行 select into 时，结果集超过一行  
+ZERO_DIVIDE         除数为 0  
+SUBSCRIPT_BEYOND_COUNT         元素下标超过嵌套表或 VARRAY 的最大值  
+SUBSCRIPT_OUTSIDE_LIMIT         使用嵌套表或 VARRAY 时，将下标指定为负数  
+VALUE_ERROR         赋值时，变量长度不足以容纳实际数据  
+LOGIN_DENIED         PL/SQL 应用程序连接到 oracle 数据库时，提供了不正确的用户名或密码  
+NOT_LOGGED_ON         PL/SQL 应用程序在没有连接 oralce 数据库的情况下访问数据  
+PROGRAM_ERROR         PL/SQL 内部问题，可能需要重装数据字典＆ pl./SQL 系统包  
+ROWTYPE_MISMATCH         宿主游标变量与 PL/SQL 游标变量的返回类型不兼容  
+SELF_IS_NULL         使用对象类型时，在 null 对象上调用对象方法  
+STORAGE_ERROR         运行 PL/SQL 时，超出内存空间  
+SYS_INVALID_ID         无效的 ROWID 字符串  
+TIMEOUT_ON_RESOURCE         Oracle 在等待资源时超时 
+ 
+============================================================= 
+ 
+BEGIN 
+《PL/SQL块》; 
+Exception 
+when no_data_found then --没有找到数据 
+《响应命令》; 
+when too_many_rows then --返回多行，隐式光标每次只能检索一行数据 
+《响应命令》; 
+when invalid_number then --字符向数字转换失败 
+《响应命令》; 
+when zero_divide then --被零除 
+《响应命令》; 
+when dup_val_on_index then --向唯一索引中插入重复数据 
+《响应命令》; 
+when invalid_cursor then --非法游标操作 
+《响应命令》; 
+when value_error then --数字的,数据转换,截字符串或强制性的错误 
+《响应命令》; 
+when others then --发生其它任何错误 
+null; --选择一：什么也不做，就当错误没发生 
+raise form_trigger_failure; --选择二：挂起当前程序 
+END; 
+ 
+ 
+常用预定义例外 
+EXCEPTION 
+WHEN CURSOR_ALREADY_OPEN THEN -- ORA-06511 SQLCODE = -6511 游标已经打开 
+..WHEN DUP_VAL_ON_INDEX THEN -- ORA-00001 SQLCODE = -1 向唯一索引中插入重复数据 
+..WHEN INVALID_CURSOR THEN -- ORA-01001 SQLCODE = -1001 非法游标操作 
+..WHEN INVALID_NUMBER THEN -- ORA-01722 SQLCODE = -1722 字符向数字转换失败 
+..WHEN LOGIN_DENIED THEN -- ORA-01017 SQLCODE = -1017  
+ 
+..WHEN NO_DATA_FOUND THEN -- ORA-01403 SQLCODE = +100 没有找到数据 
+..WHEN NOT_LOGGED_ON THEN -- ORA-01012 SQLCODE = -1012  
+..WHEN PROGRAM_ERROR THEN -- ORA-06501 SQLCODE = -6501 程序错误 
+..WHEN STORAGE_ERROR THEN -- ORA-06500 SQLCODE = -6500 
+..WHEN TIMEOUT_ON_RESOURCE THEN -- ORA-00051 SQLCODE = -51 
+ 
+..WHEN TOO_MANY_ROWS THEN -- ORA-01422 SQLCODE = -1422 返回多行 
+..WHEN TRANSACTION_BACKED_OUT THEN -- ORA-00061 SQLCODE = -61 
+ 
+..WHEN VALUE_ERROR THEN -- ORA-06502 SQLCODE = -6502 数值转换错误 
+..WHEN ZERO_DIVIDE THEN -- ORA-01476 SQLCODE = -1476 被零除 
+..WHEN OTHERS THEN -- 其它任何错误的处理 
+..END;  
+ 
+ORA-00001: 违反唯一约束条件 (.)
+ORA-00017: 请求会话以设置跟踪事件
+ORA-00018: 超出最大会话数
+ORA-00019: 超出最大会话许可数
+ORA-00020: 超出最大进程数 ()
+ORA-00021: 会话附属于其它某些进程；无法转换会话
+ORA-00022: 无效的会话 ID；访问被拒绝
+ORA-00023: 会话引用进程私用内存；无法分离会话
+ORA-00024: 单一进程模式下不允许从多个进程注册
+ORA-00025: 无法分配 
+ORA-00026: 丢失或无效的会话 ID
+ORA-00027: 无法删去当前会话
+ORA-00028: 您的会话己被删去
+ORA-00029: 会话不是用户会话
+ORA-00030: 用户会话 ID 不存在。
+ORA-00031: 标记要删去的会话
+ORA-00032: 无效的会话移植口令
+ORA-00033: 当前的会话具有空的移植口令
+ORA-00034: 无法在当前 PL/SQL 会话中 
+ORA-00035: LICENSE_MAX_USERS 不能小于当前用户数
+ORA-00036: 超过递归 SQL () 级的最大值
+ORA-00037: 无法转换到属于不同服务器组的会话
+ORA-00038: 无法创建会话: 服务器组属于其它用户
+ORA-00050: 获取入队时操作系统出错
+ORA-00051: 等待资源超时
+ORA-00052: 超出最大入队资源数 ()
+ORA-00053: 超出最大入队数
+ORA-00054: 资源正忙，要求指定 NOWAIT
+ORA-00055: 超出 DML 锁的最大数
+ORA-00056: 对象 '.' 上的 DDL 锁以不兼容模式挂起
+ORA-00057: 超出临时表锁的最大数
+ORA-00058: DB_BLOCK_SIZE 必须为才可安装此数据库 (非 )
+ORA-00059: 超出 DB_FILES 的最大值
+ORA-00060: 等待资源时检测到死锁
+ORA-00061: 另一个例程设置了不同的 DML_LOCKS
+ORA-00062: 无法获得 DML 全表锁定；DML_LOCKS 为 0
+ORA-00063: 超出 LOG_FILES 的最大数
+ORA-00064: 对象过大以至无法分配在此 O/S (，)
+ORA-00065: FIXED_DATE 的初始化失败
+ORA-00066: LOG_FILES 为  但需要成为  才可兼容
+ORA-00067: 值  对参数  无效；至少必须为 
+ORA-00068: 值  对参数  无效，必须在  和  之间
+ORA-00069: 无法获得锁定 -- 禁用了表锁定
+ORA-00070: 命令无效
+ORA-00071: 进程号必须介于 1 和  之间
+ORA-00072: 进程""不活动
+ORA-00073: 命令  介于  和  个参数之间时使用
+ORA-00074: 未指定进程
+ORA-00075: 在此例程未找到进程 ""
+ORA-00076: 未找到转储 
+ORA-00077: 转储  无效
+ORA-00078: 无法按名称转储变量
+ORA-00079: 未找到变量 
+ORA-00080: 层次  指定的全局区域无效
+ORA-00081: 地址范围 [，) 不可读
+ORA-00082:  的内存大小不在有效集合 [1], [2], [4] 之内
+ORA-00083: 警告: 可能损坏映射的 SGA 
+ORA-00084: 全局区域必须为 PGA, SGA 或 UGA
+ORA-00085: 当前调用不存在
+ORA-00086: 用户调用不存在
+ORA-00087: 命令无法在远程例程上执行
+ORA-00088: 共享服务器无法执行命令
+ORA-00089: ORADEBUG 命令中无效的例程号
+ORA-00090: 未能将内存分配给群集数据库 ORADEBUG 命令
+ORA-00091: LARGE_POOL_SIZE 至少必须为 
+ORA-00092: LARGE_POOL_SIZE 必须大于 LARGE_POOL_MIN_ALLOC
+ORA-00093:  必须介于  和  之间
+ORA-00094:  要求整数值
+ORA-00096: 值  对参数  无效，它必须来自  之间
+ORA-00097: 使用 Oracle SQL 特性不在 SQL92  级中
+ORA-00099: 等待资源时发生超时，可能是 PDML 死锁所致
+ORA-00100: 未找到数据
+ORA-00101: 系统参数 DISPATCHERS 的说明无效
+ORA-00102: 调度程序无法使用网络协议 
+ORA-00103: 无效的网络协议；供调度程序备用
+ORA-00104: 检测到死锁；全部公用服务器已锁定等待资源
+ORA-00105: 未配置网络协议  的调度机制
+ORA-00106: 无法在连接到调度程序时启动/关闭数据库
+ORA-00107: 无法连接到 ORACLE 监听器进程
+ORA-00108: 无法设置调度程序以同步进行连接
+ORA-00111: 由于服务器数目限制在 , 所以没有启动所有服务器
+ORA-00112: 仅能创建多达  (最多指定) 个调度程序
+ORA-00113: 协议名  过长
+ORA-00114: 缺少系统参数 SERVICE_NAMES 的值
+ORA-00115: 连接被拒绝；调度程序连接表已满
+ORA-00116: SERVICE_NAMES 名过长
+ORA-00117: 系统参数 SERVICE_NAMES 的值超出范围
+ORA-00118: 系统参数 DISPATCHERS 的值超出范围
+ORA-00119: 系统参数  的说明无效
+ORA-00120: 未启用或安装调度机制
+ORA-00121: 在缺少 DISPATCHERS 的情况下指定了 SHARED_SERVERS
+ORA-00122: 无法初始化网络配置
+ORA-00123: 空闲公用服务器终止
+ORA-00124: 在缺少 MAX_SHARED_SERVERS 的情况下指定了 DISPATCHERS
+ORA-00125: 连接被拒绝；无效的演示文稿
+ORA-00126: 连接被拒绝；无效的重复
+ORA-00127: 调度进程  不存在
+ORA-00128: 此命令需要调度进程名
+ORA-00129: 监听程序地址验证失败 ''
+ORA-00130: 监听程序地址 '' 无效
+ORA-00131: 网络协议不支持注册 ''
+ORA-00132: 语法错误或无法解析的网络名称 ''
+ORA-00150: 重复的事务处理 ID
+ORA-00151: 无效的事务处理 ID
+ORA-00152: 当前会话与请求的会话不匹配
+ORA-00153: XA 库中的内部错误
+ORA-00154: 事务处理监视器中的协议错误
+ORA-00155: 无法在全局事务处理之外执行工作
+ORA-00160: 全局事务处理长度  超出了最大值 ()
+ORA-00161: 事务处理的分支长度  非法 (允许的最大长度为 )
+ORA-00162: 外部 dbid 的长度  超出了最大值 ()
+ORA-00163: 内部数据库名长度  超出了最大值 ()
+ORA-00164: 在分布式事务处理中不允许独立的事务处理
+ORA-00165: 不允许对远程操作进行可移植分布式自治转换
+ORA-00200: 无法创建控制文件
+ORA-00201: 控制文件版本  与 ORACLE 版本  不兼容
+ORA-00202: 控制文件: ''
+ORA-00203: 使用错误的控制文件
+ORA-00204: 读控制文件时出错 (块 ，# 块 )
+ORA-00205: 标识控制文件出错，有关详情，请检查警告日志
+ORA-00206: 写控制文件时出错 (块 ，# 块 )
+ORA-00207: 控制文件不能用于同一数据库
+ORA-00208: 控制文件的名称数超出限制 
+ORA-00209: 控制文件块大小不匹配，有关详情，请检查警告日志
+ORA-00210: 无法打开指定的控制文件
+ORA-00211: 控制文件与先前的控制文件不匹配
+ORA-00212: 块大小  低于要求的最小大小 ( 字节)
+ORA-00213: 不能重新使用控制文件；原文件大小为 ，还需 
+ORA-00214: 控制文件 '' 版本  与文件 '' 版本  不一致
+ORA-00215: 必须至少存在一个控制文件
+ORA-00216: 无法重新调整从 8.0.2 移植的控制文件大小
+ORA-00217: 从 9.0.1 进行移植无法重新调整控制文件的大小
+ORA-00218: 控制文件的块大小  与 DB_BLOCK_SIZE () 不匹配
+ORA-00219: 要求的控制文件大小  超出了允许的最大值 
+ORA-00220: 第一个例程未安装控制文件，有关详情，请检查警告日志
+ORA-00221: 写入控制文件出错
+ORA-00222: 操作将重新使用当前已安装控制文件的名称
+ORA-00223: 转换文件无效或版本不正确
+ORA-00224: 控制文件重设大小尝试使用非法记录类型 ()
+ORA-00225: 控制文件的预期大小  与实际大小  不同
+ORA-00226: 备用控制文件打开时不允许进行操作
+ORA-00227: 控制文件中检测到损坏的块: (块 ，# 块 )
+ORA-00228: 备用控制文件名长度超出了最大长度 
+ORA-00229: 操作不允许: 已挂起快照控制文件入队
+ORA-00230: 操作不允许: 无法使用快照控制文件入队
+ORA-00231: 快照控制文件未命名
+ORA-00232: 快照控制文件不存在, 已损坏或无法读取
+ORA-00233: 控制文件副本已损坏或无法读取
+ORA-00234: 标识或打开快照或复制控制文件时出错
+ORA-00235: 控制文件固定表因并发更新而不一致
+ORA-00236: 快照操作不允许: 挂上的控制文件为备份文件
+ORA-00237: 快照操作不允许: 控制文件新近创建
+ORA-00238: 操作将重用属于数据库一部分的文件名
+ORA-00250: 未启动存档器
+ORA-00251: LOG_ARCHIVE_DUPLEX_DEST 不能是与字符串  相同的目的地
+ORA-00252: 日志  在线程  上为空，无法存档
+ORA-00253: 字符限制在  以内，归档目的字符串  超出此限制
+ORA-00254: 存档控制字符串 '' 时出错
+ORA-00255: 存档日志  (线程 , 序列 # ) 时出错
+ORA-00256: 无法翻译归档目的字符串 
+ORA-00257: 存档器错误。在释放之前仅限于内部连接
+ORA-00258: NOARCHIVELOG 模式下的人工存档必须标识日志
+ORA-00259: 日志  (打开线程 ) 为当前日志，无法存档
+ORA-00260: 无法找到联机日志序列  (线程 )
+ORA-00261: 正在存档或修改日志  (线程 )
+ORA-00262: 当前日志  (关闭线程 ) 无法切换
+ORA-00263: 线程  没有需要存档的记录
+ORA-00264: 不要求恢复
+ORA-00265: 要求例程恢复，无法设置 ARCHIVELOG 模式
+ORA-00266: 需要存档日志文件名
+ORA-00267: 无需存档日志文件名
+ORA-00268: 指定的日志文件不存在 ''
+ORA-00269: 指定的日志文件为线程  的一部分 (非 )
+ORA-00270: 创建存档日志  时出错
+ORA-00271: 没有需要存档的日志
+ORA-00272: 写存档日志  时出错
+ORA-00273: 未记录的直接加载数据的介质恢复
+ORA-00274: 非法恢复选项 
+ORA-00275: 已经开始介质恢复
+ORA-00276: CHANGE 关键字已指定但未给出更改编号
+ORA-00277: UNTIL 恢复标志  的非法选项
+ORA-00278: 此恢复不再需要日志文件 ''
+ORA-00279: 更改  (在  生成) 对于线程  是必需的
+ORA-00280: 更改  对于线程  是按序列 #  进行的
+ORA-00281: 不能使用调度进程执行介质恢复
+ORA-00282: UPI  调用不被支持，请使用 ALTER DATABASE RECOVER
+ORA-00283: 恢复会话因错误而取消
+ORA-00284: 恢复会话仍在进行
+ORA-00285: TIME 未作为字符串常数给出
+ORA-00286: 无可用成员，或成员无有效数据
+ORA-00287: 未找到指定的更改编号  (在线程  中)
+ORA-00288: 要继续恢复，请键入 ALTER DATABASE RECOVER CONTINUE
+ORA-00289: 建议: 
+ORA-00290: 操作系统出现存档错误。请参阅下面的错误
+ORA-00291: PARALLEL 选项要求数字值
+ORA-00292: 未安装并行恢复功能
+ORA-00293: 控制文件与重做日志不同步
+ORA-00294: 无效的存档日志格式标识 ''
+ORA-00295: 数据文件号  无效，必须介于 1 与  之间
+ORA-00296: 已超出 RECOVER DATAFILE LIST 的最大文件数 ()
+ORA-00297: 必须在 RECOVER DATAFILE START 之前指定 RECOVER DATAFILE LIST
+ORA-00298: 丢失或无效的 TIMEOUT 间隔
+ORA-00299: 必须在数据文件  上使用文件级介质恢复
+ORA-00300: 指定的重做日志块大小  非法 - 超出限制 
+ORA-00301: 添加日志文件 '' 时出错 - 无法创建文件
+ORA-00302: 日志超出限制 
+ORA-00303: 无法处理多次中断的重做
+ORA-00304: 请求的 INSTANCE_NUMBER 在使用中
+ORA-00305: 日志  (线程 ) 不一致；属于另一个数据库
+ORA-00306: 此数据库中的例程限制 
+ORA-00307: 请求的 INSTANCE_NUMBER 超出限制，最大为 
+ORA-00308: 无法打开存档日志 ''
+ORA-00309: 日志属于错误的数据库
+ORA-00310: 存档日志包含序列 ；要求序列 
+ORA-00311: 无法从存档日志读取标题
+ORA-00312: 联机日志  线程 : ''
+ORA-00313: 无法打开日志组  (线程 ) 的成员
+ORA-00314: 日志  (线程 )，预计序号  与  不匹配
+ORA-00315: 日志  (线程 )，标题中的线程 #  错误
+ORA-00316: 日志  (线程 )，标题中的类型  不是日志文件
+ORA-00317: 标题中的文件类型  不是日志文件
+ORA-00318: 日志  (线程 )，预计文件大小  与  不匹配
+ORA-00319: 日志  (线程 ) 具有错误的日志重置状态
+ORA-00320: 无法从日志  (线程 ) 读取文件标题
+ORA-00321: 日志  (线程 )，无法更新日志文件标题
+ORA-00322: 日志  (线程 ) 不是当前副本
+ORA-00323: 线程  的当前日志不可用而所有其它日志均需要存档
+ORA-00324: 日志文件 '' 的翻译名 '' 太长， 字符超出  限制
+ORA-00325: 已归档线程  的日志，标题中的线程 #  错误
+ORA-00326: 日志在更改  开始，需要更早的更改 
+ORA-00327: 日志  (线程 )，实际大小  小于需要的 
+ORA-00328: 归档日志在更改  结束，需要稍后的更改 
+ORA-00329: 归档日志在更改  开始，需要更改 
+ORA-00330: 归档日志在更改  结束，需要更改 
+ORA-00331: 日志版本  与 ORACLE 版本  不兼容
+ORA-00332: 归档日志过小 - 可能未完全归档
+ORA-00333: 重做日志读取块  计数  出错
+ORA-00334: 归档日志: ''
+ORA-00335: 联机日志 : 没有此编号的日志，日志不存在
+ORA-00336: 大小为  的日志文件块数小于最小  块数
+ORA-00337: 日志文件 '' 不存在且未指定大小
+ORA-00338: 日志  (线程 ) 比控制文件更新
+ORA-00339: 归档日志未包含任何重做
+ORA-00340: 处理联机日志  (线程 ) 时出现 I/O 错误
+ORA-00341: 日志  (线程 )，标题中的日志 #  错误
+ORA-00342: 归档日志在上一个 RESETLOGS 之前创建程序包
+ORA-00343: 错误过多，已关闭日志成员
+ORA-00344: 无法重新创建联机日志 ''
+ORA-00345: 重做日志写入块  计数  出错
+ORA-00346: 日志成员标记为 STALE
+ORA-00347: 日志  (线程 )，预计块大小  与  不匹配
+ORA-00348: 单一进程重做失败；必须中止例程
+ORA-00349: 无法获得 '' 的块大小
+ORA-00350: 日志  (线程 ) 中需要归档
+ORA-00351: recover-to 时间无效
+ORA-00352: 线程  的所有日志均需要归档 - 无法启用
+ORA-00353: 日志损坏接近块  更改  时间 
+ORA-00354: 损坏重做日志块标题
+ORA-00355: 更改编号无次序
+ORA-00356: 更改说明中的长度不一致
+ORA-00357: 日志文件指定了过多成员，最大为 
+ORA-00358: 指定了过多文件成员，最大为 
+ORA-00359: 日志文件组  不存在
+ORA-00360: 非日志文件成员: 
+ORA-00361: 无法删除最后一个日志成员  (组 )
+ORA-00362: 组成组  中的有效日志文件要求输入成员
+ORA-00363: 日志不是归档版本
+ORA-00364: 无法将标题写入新日志成员
+ORA-00365: 指定日志不是正确的下一个日志
+ORA-00366: 日志  (线程 )，文件标题中的校验和错误
+ORA-00367: 日志文件标题中的校验和错误
+ORA-00368: 重做日志块中的校验和错误
+ORA-00369: 线程  的当前日志不可用且其它日志已被清除
+ORA-00370: Rcbchange 操作过程中可能出现死锁
+ORA-00371: 共享池内存不足
+ORA-00372: 此时无法修改文件 
+ORA-00373: 联机日志版本  与 ORACLE 版本  不兼容
+ORA-00374: 参数 db_block_size =  无效; 它必须是  的倍数, 范围为 [..]
+ORA-00375: 无法获得默认 db_block_size
+ORA-00376: 此时无法读取文件 
+ORA-00377: 文件  的频繁备份导致写操作延迟
+ORA-00378: 无法按指定创建缓冲池
+ORA-00379: 缓冲池  中无法提供 K 块大小的空闲缓冲区
+ORA-00380: 无法指定 db_k_cache_size, 因为 K 是标准块大小
+ORA-00381: 无法将新参数和旧参数同时用于缓冲区高速缓存的大小说明
+ORA-00382:  不是有效的块大小, 有效范围为 [..]
+ORA-00383: DEFAULT 高速缓存的块大小  不能减少至零
+ORA-00384: 没有足够的内存来增加高速缓存的大小
+ORA-00385: cannot enable Very Large Memory with new buffer cache parameters
+ORA-00390: 日志  (线程 ) 正被清除，无法成为当前日志
+ORA-00391: 所有线程必须同时转换为新的日志格式
+ORA-00392: 日志  (线程 ) 正被清除，不允许操作
+ORA-00393: 脱机数据文件的恢复需要日志  (线程 )
+ORA-00394: 在尝试存档时重新使用联机日志
+ORA-00395: '克隆' 数据库的联机日志必须重命名
+ORA-00396: 错误  需要退回到单次遍历恢复
+ORA-00397: 对于文件  (块 ), 检测到写入丢失情况
+ORA-00398: 由于重新配置而中止了线程恢复
+ORA-00399: 重做日志中的更改说明已损坏
+ORA-00400: 无效的版本值  (对于参数 )
+ORA-00401: 此版本不支持参数  的值
+ORA-00402: 版本  的数据库更改无法用于版本 
+ORA-00403:  () 不同于其它例程 ()
+ORA-00404: 未找到转换文件: ''
+ORA-00405: 兼容类型""
+ORA-00406: COMPATIBLE 参数需要为  或更大
+ORA-00407: 不允许从版本 . 到 . 滚动升级
+ORA-00408: 参数  设置为 TRUE
+ORA-00409: COMPATIBLE 必须是  或更高值才能使用 AUTO SEGMENT SPACE MANAGEMENT
+ORA-00436: 没有 ORACLE 软件使用权，请与 Oracle 公司联系获得帮助
+ORA-00437: 没有 ORACLE 软件功能使用权，请与 Oracle 公司联系获得帮助
+ORA-00438: 未安装  选项
+ORA-00439: 未启用特性: 
+ORA-00443: 背景进程 "" 未启动
+ORA-00444: 背景进程 "" 启动时失败
+ORA-00445: 背景进程 "" 在  秒之后仍没有启动
+ORA-00446: 背景进程意外启动
+ORA-00447: 背景进程出现致命错误
+ORA-00448: 背景进程正常结束
+ORA-00449: 背景进程 '' 因错误  异常终止
+ORA-00470: LGWR 进程因错误而终止
+ORA-00471: DBWR 进程因错误而终止
+ORA-00472: PMON 进程因错误而终止
+ORA-00473: ARCH 进程因错误而终止
+ORA-00474: SMON 进程因错误而终止
+ORA-00475: TRWR 进程因错误而终止
+ORA-00476: RECO 进程因错误而终止
+ORA-00477: SNP* 进程因错误而终止
+ORA-00478: SMON 进程由于  错误终止
+ORA-00480: LCK* 进程因错误而终止
+ORA-00481: LMON 进程因错误而终止
+ORA-00482: LMD* 进程因错误而终止
+ORA-00483: 关闭进程过程中异常终止
+ORA-00484: LMS* 进程因错误而终止
+ORA-00485: DIAG 进程由于  错误终止
+ORA-00486: 功能不可用
+ORA-00568: 超出中断处理程序的最大数
+ORA-00574: osndnt: $CANCEL 失败 (中断)
+ORA-00575: osndnt: $QIO 失败 (发送 out-of-band 中断)
+ORA-00576: 带内中断协议错误
+ORA-00577: 带外中断协议错误
+ORA-00578: 重置协议错误
+ORA-00579: osndnt: 服务器收到连接请求格式不正确
+ORA-00580: 协议版本不匹配
+ORA-00581: osndnt: 无法分配上下文区域
+ORA-00582: osndnt: 无法撤消分配上下文区域
+ORA-00583: osndnt: $TRNLOG 失败
+ORA-00584: 无法关闭连接
+ORA-00585: 主机名称格式错误
+ORA-00586: osndnt: LIB$ASN_WTH_MBX 失败
+ORA-00587: 无法连接到远程主机
+ORA-00588: 来自主机的信息过短
+ORA-00589: 来自主机的信息数据长度错误
+ORA-00590: 来自主机的信息类型错误
+ORA-00591: 写入的字节数错误
+ORA-00592: osndnt: $QIO 失败 (邮箱队列)
+ORA-00593: osndnt: $DASSGN 失败 (网络设备)
+ORA-00594: osndnt: $DASSGN 失败 (邮箱)
+ORA-00595: osndnt: $QIO 失败 (接收)
+ORA-00596: osndnt: $QIO 失败 (发送)
+ORA-00597: osndnt: $QIO 失败 (邮箱队列)
+ORA-00598: osndnt: $QIO IO 失败 (邮箱读取)
+ORA-00600: 内部错误代码，参数: [], [], [], [], [], [], [], []
+ORA-00601: 清除锁定冲突
+ORA-00602: 内部编程异常错误
+ORA-00603: ORACLE 服务器会话因致命错误而终止
+ORA-00604: 递归 SQL 层  出现错误
+ORA-00606: 内部错误代码
+ORA-00607: 当更改数据块时出现内部错误
+ORA-00701: 无法改变热启动数据库所需的对象
+ORA-00702: 引导程序版本 '' 与版本 '' 不一致
+ORA-00703: 超出行高速缓存例程锁的最大数
+ORA-00704: 引导程序进程失败
+ORA-00705: 启动过程中的状态不一致；请在关闭例程后重新启动
+ORA-00706: 更改文件 '' 的格式时出错
+ORA-00816: 错误信息无法转换
+ORA-00900: 无效 SQL 语句
+ORA-00901: 无效 CREATE 命令
+ORA-00902: 无效数据类型
+ORA-00903: 表名无效
+ORA-00904: : 无效的标识符
+ORA-00905: 缺少关键字
+ORA-00906: 缺少左括号
+ORA-00907: 缺少右括号
+ORA-00908: 缺少 NULL 关键字
+ORA-00909: 参数个数无效
+ORA-00910: 指定的长度对于数据类型而言过长
+ORA-00911: 无效字符
+ORA-00913: 值过多
+ORA-00914: 缺少 ADD 关键字
+ORA-00915: 当前不允许网络访问字典表
+ORA-00917: 缺少逗号
+ORA-00918: 未明确定义列
+ORA-00919: 无效函数
+ORA-00920: 无效的关系运算符
+ORA-00921: 未预期的 SQL 命令结尾
+ORA-00922: 缺少或无效选项
+ORA-00923: 未找到预期 FROM 关键字
+ORA-00924: 缺少 BY 关键字
+ORA-00925: 缺失 INTO 关键字
+ORA-00926: 缺少 VALUES 关键字
+ORA-00927: 缺少等号
+ORA-00928: 缺少 SELECT 关键字
+ORA-00929: 缺少句号
+ORA-00930: 缺少星号
+ORA-00931: 缺少标识
+ORA-00932: 不一致的数据类型: 要求  得到的却是 
+ORA-00933: SQL 命令未正确结束
+ORA-00934: 此处不允许使用分组函数
+ORA-00935: 分组函数的嵌套太深
+ORA-00936: 缺少表达式
+ORA-00937: 非单组分组函数
+ORA-00938: 函数没有足够的参数
+ORA-00939: 函数的参数过多
+ORA-00940: 无效的 ALTER 命令
+ORA-00941: 群集名缺少
+ORA-00942: 表或视图不存在
+ORA-00943: 群集不存在
+ORA-00944: 没有足够的聚簇列数
+ORA-00945: 指定的聚簇列不存在
+ORA-00946: 缺少 TO 关键字
+ORA-00947: 没有足够的值
+ORA-00948: 不再支持 ALTER CLUSTER 语句
+ORA-00949: 非法引用远程数据库
+ORA-00950: 无效 DROP 选项
+ORA-00951: 群集非空
+ORA-00952: 缺少 GROUP 关键字
+ORA-00953: 缺少或无效索引名
+ORA-00954: 缺少 IDENTIFIED 关键字
+ORA-00955: 名称已由现有对象使用
+ORA-00956: 缺少或无效审计选项
+ORA-00957: 列名重复
+ORA-00958: 缺少 CHECK 关键字
+ORA-00959: 表空间''不存在
+ORA-00960: 选择列表中的命名含糊
+ORA-00961: 错误的日期/间隔值
+ORA-00962: group-by / order-by 表达式过多
+ORA-00963: 不支持的间隔类型
+ORA-00964: 表名不在 FROM 列表中
+ORA-00965: 列别名中不允许'*'
+ORA-00966: 缺少 TABLE 关键字
+ORA-00967: 缺少 WHERE 关键字
+ORA-00968: 缺少 INDEX 关键字
+ORA-00969: 缺少 ON 关键字
+ORA-00970: 缺少 WITH 关键字
+ORA-00971: 缺少 SET 关键字
+ORA-00972: 标识过长
+ORA-00973: 无效的行数估计
+ORA-00974: 无效 PCTFREE 值 (百分比)
+ORA-00975: 不允许日期 + 日期
+ORA-00976: 此处不允许为 LEVEL, PRIOR 或 ROWNUM
+ORA-00977: 重复的审计选项
+ORA-00978: 嵌套分组函数没有 GROUT BY
+ORA-00979: 不是 GROUP BY 表达式
+ORA-00980: 同义词转换不再有效
+ORA-00981: 不能将表和系统审计选项混在一起
+ORA-00982: 缺少加号
+ORA-00984: 列在此处不允许
+ORA-00985: 无效的程序名
+ORA-00986: 缺少或无效组名
+ORA-00987: 缺少或无效用户名
+ORA-00988: 缺少或无效口令
+ORA-00989: 给出的用户名口令过多
+ORA-00990: 缺少或无效权限
+ORA-00991: 过程仅有 MAC 权限
+ORA-00992: REVOKE 命令格式无效
+ORA-00993: 缺少 GRANT 关键字
+ORA-00994: 缺少 OPTION 关键字
+ORA-00995: 缺少或无效同义词标识
+ORA-00996: 连接运算符是 || 而不是 |
+ORA-00997: 非法使用 LONG 数据类型
+ORA-00998: 必须使用列别名命名此表达式
+ORA-00999: 无效的视图名
+ORA-01000: 超出打开游标的最大数
+ORA-01001: 无效的游标
+ORA-01002: 读取违反顺序
+ORA-01003: 语句未进行语法分析
+ORA-01004: 不支持默认用户名特性；登录被拒绝
+ORA-01005: 未给出口令；登录被拒绝
+ORA-01006: 赋值变量不存在
+ORA-01007: 选择列表中没有变量
+ORA-01008: 并非所有变量都已关联
+ORA-01009: 缺少法定参数
+ORA-01010: 无效的 OCI 操作
+ORA-01011: 在与第 6 版服务器会话时不能使用第 7 版兼容模式
+ORA-01012: 没有登录
+ORA-01013: 用户请求取消当前的操作
+ORA-01014: ORACLE 正在关闭过程中
+ORA-01015: 循环登录请求
+ORA-01016: 此函数仅可以在读取后调用
+ORA-01017: 无效的用户名/口令；拒绝登录
+ORA-01018: 列不具有 LONG 数据类型
+ORA-01019: 无法在用户方分配内存
+ORA-01020: 未知的上下文状态
+ORA-01021: 指定的上下文大小无效
+ORA-01022: 此配置中不支持数据库操作
+ORA-01023: 未找到游标上下文 (无效的游标编号)
+ORA-01024: OCI 调用中的数据类型无效
+ORA-01025: UPI 参数超出范围
+ORA-01026: 赋值列表中存在多个大小 > 4000 的缓冲区
+ORA-01027: 在数据定义操作中不允许对变量赋值
+ORA-01028: 内部双工错误
+ORA-01029: 内部双工错误
+ORA-01030: SELECT ...INTO 变量不存在
+ORA-01031: 权限不足
+ORA-01032: 没有这样的用户标识
+ORA-01033: ORACLE 正在初始化或关闭过程中
+ORA-01034: ORACLE 不可用
+ORA-01035: ORACLE 只允许具有 RESTRICTED SESSION 权限的用户使用
+ORA-01036: 非法的变量名/编号
+ORA-01037: 超出最大游标内存
+ORA-01038: 无法写入数据库文件版本  (使用 ORACLE 版本 )
+ORA-01039: 视图基本对象的权限不足
+ORA-01040: 口令中的字符无效；登录被拒绝
+ORA-01041: 内部错误，hostdef 扩展名不存在
+ORA-01042: 不允许使用打开游标分离会话
+ORA-01043: 用户方内存损坏 [], [], [], []
+ORA-01044: 缓冲区大小  (与变量关联) 超出了最大限制 
+ORA-01045: 用户  没有 CREATE SESSION 权限；登录被拒绝
+ORA-01046: 无法获得扩展上下文区域的空间
+ORA-01047: 以上错误出现在 schema=, package=, procedure= 中
+ORA-01048: 给定的上下文中无法找到指定的过程
+ORA-01049: 流动 RPC 中不支持按名称赋值
+ORA-01050: 无法获得打开上下文区域的空间
+ORA-01051: 延迟 rpc 缓冲区格式无效
+ORA-01052: 未指定所需的目的 LOG_ARCHIVE_DUPLEX_DEST
+ORA-01053: 无法读取用户存储地址
+ORA-01054: 无法写入用户存储地址
+ORA-01057: 用户出口中引用的 block.field 无效或有歧义
+ORA-01058: 内部 New Upi 接口错误
+ORA-01059: 在赋值或执行之前进行语法分析
+ORA-01060: 不允许数组赋值或执行
+ORA-01061: 无法使用第 7 版客户应用程序启动第 8 版服务器
+ORA-01062: 无法分配定义缓冲区所需的内存
+ORA-01070: 服务器使用 Oracle 的旧版本
+ORA-01071: 无法不启动 ORACLE 而执行操作
+ORA-01072: 无法停止 ORACLE；因为 ORACLE 不在运行
+ORA-01073: 致命的连接错误: 不能识别的调用类型
+ORA-01074: 无法关闭 ORACLE；请首先在注册会话中注销
+ORA-01075: 您现在已登录
+ORA-01076: 尚不支持每个进程的多次登录
+ORA-01077: 背景进程初始化失败
+ORA-01078: 处理系统参数失败
+ORA-01079: ORALCE 数据库未正确创建，操作中止
+ORA-01080: 关闭 ORACLE 时出错
+ORA-01081: 无法启动已在运行的 ORACLE --- 请首先关闭
+ORA-01082: 'row_locking = always' 要求事务处理处理选项
+ORA-01083: 参数 "" 的值与其它例程序的相应参数值不一致。
+ORA-01084: OCI 调用中的参数无效
+ORA-01085: 延迟 rpc 到 ".." 之前的错误
+ORA-01086: 从未创建保留点 ''
+ORA-01087: 不能启动 ORALCE --- 现在已登录
+ORA-01088: 不能在存在活动进程时关闭 ORACLE
+ORA-01089: 正在进行紧急关闭 - 不允许进行任何操作
+ORA-01090: 正在进行关闭 --- 不允许连接
+ORA-01091: 强行启动出错
+ORA-01092: ORACLE 例程终止。强行断开连接
+ORA-01093: ALTER DATABASE CLOSE 仅允许在没有连接会话时使用
+ORA-01094: ALTER DATABASE CLOSE 正在进行。不允许连接
+ORA-01095: DML 语句处理了零个行
+ORA-01096: 程序版本 () 与例程 () 不兼容
+ORA-01097: 无法在事务处理过程中关闭 - 首先提交或返回
+ORA-01098: 在 Long Insert 过程中出现程序接口错误
+ORA-01099: 如果在单进程模式下启动，则无法在 SHARED 模式下安装数据库
+ORA-01100: 数据库已安装
+ORA-01101: 要创建的数据库当前正由其它例程安装
+ORA-01102: 无法在 EXCLUSIVE 模式下安装数据库
+ORA-01103: 控制文件中的数据库名 '' 不是 ''
+ORA-01104: 控制文件数 () 不等于 
+ORA-01105: 安装与其它例程的安装不兼容
+ORA-01106: 必须在卸下之前关闭数据库
+ORA-01107: 必须安装数据库才可以进行介质恢复
+ORA-01108: 文件  正处于备份或介质恢复过程中
+ORA-01109: 数据库未打开
+ORA-01110: 数据文件 : ''
+ORA-01111: 数据文件  名称未知 - 请重命名以更正文件
+ORA-01112: 未启动介质恢复
+ORA-01113: 文件  需要介质恢复
+ORA-01114: 将块写入文件  时出现 IO 错误 (块 # )
+ORA-01115: 从文件  读取块时出现 IO 错误 (块 # )
+ORA-01116: 打开数据库文件时出错
+ORA-01117: 对文件 '' 添加非法块大小: ；限制为 
+ORA-01118: 无法添加任何其它数据库文件: 超出限制 
+ORA-01119: 创建数据库文件 '' 时出错
+ORA-01120: 无法删除联机数据库文件 
+ORA-01121: 无法重命名数据库文件  - 文件在使用中或在恢复中
+ORA-01122: 数据库文件  验证失败
+ORA-01123: 无法启动联机备份；未启用介质恢复
+ORA-01124: 无法恢复数据文件  - 文件在使用中或在恢复中
+ORA-01125: 无法禁用介质恢复 - 文件  设置了联机备份
+ORA-01126: 对于此操作，数据库必须以 EXCLUSIVE 模式安装且未打开
+ORA-01127: 数据库名 '' 超出  个字符的限制
+ORA-01128: 无法启动联机备份 - 文件  处于脱机状态
+ORA-01129: 用户默认或临时表空间不存在
+ORA-01130: 数据库文件版本  与 ORACLE 版本  不兼容
+ORA-01131: DB_FILES 系统参数值  超出限制 
+ORA-01132: 数据库文件名 '' 的长度超出  个字符的限制
+ORA-01133: 日志文件名 '' 的长度超出  个字符的限制
+ORA-01134: 数据库已由其它例程独立安装
+ORA-01135: DML/query 访问的文件  处于脱机状态
+ORA-01136: 文件  ( 块) 的指定大小小于  块的原大小
+ORA-01137: 数据文件  仍处于脱机过程中
+ORA-01138: 数据库必须在此例程中打开或根本没有打开
+ORA-01139: RESETLOGS 选项仅在不完全数据库恢复后有效
+ORA-01140: 无法结束联机备份 - 所有文件均处于脱机状态
+ORA-01141: 重命名数据文件  时出错 - 未找到新文件 ''
+ORA-01142: 无法结束联机备份 - 没有文件在备份中
+ORA-01143: 不能禁用介质恢复 - 文件  需要介质恢
